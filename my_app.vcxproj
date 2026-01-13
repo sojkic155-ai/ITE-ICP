@@ -73,13 +73,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ExecutablePath>$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\bin;$(VC_ExecutablePath_x64);$(CommonExecutablePath)</ExecutablePath>
-    <IncludePath>$(OPENCV_DIR)\include;$(OPENCV_DIR)\include;$(OPENCV_DIR)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
-    <LibraryPath>$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(OPENCV_DIR)\include;$(OPENCV_DIR)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <LibraryPath>$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ExecutablePath>$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\bin;$(VC_ExecutablePath_x64);$(CommonExecutablePath);$(OPENCV_DIR)\x64\vc16\bin;</ExecutablePath>
-    <IncludePath>$(OPENCV_DIR)\include;$(OPENCV_DIR)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);$(OPENCV_DIR)\include;</IncludePath>
-    <LibraryPath>$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\lib;</LibraryPath>
+    <IncludePath>$(OPENCV_DIR)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);$(OPENCV_DIR)\include;</IncludePath>
+    <LibraryPath>$(OPENCV_DIR)\x64\vc16\lib;$(OPENCV_DIR)\x64\vc16\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(OPENCV_DIR)\x64\vc16\bin;$(OPENCV_DIR)\x64\vc16\lib;</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ExecutablePath>$(OPENCV_DIR)\x64\vc16\bin;$(VC_ExecutablePath_x86);$(CommonExecutablePath)</ExecutablePath>
@@ -109,6 +109,14 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -126,6 +134,14 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -134,14 +150,22 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\libs\irrKlang-64bit-1.6.0\irrKlang-64bit-1.6.0\include;$(ProjectDir)include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\libs\irrKlang-64bit-1.6.0\include;$(ProjectDir)include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>irrKlang.lib;opencv_world4120d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies);$(ProjectDir)lib\irrKlang.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\libs\irrKlang-64bit-1.6.0\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;C:\libs\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -152,7 +176,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\libs\irrKlang-64bit-1.6.0\irrKlang-64bit-1.6.0\include;$(ProjectDir)include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\libs\irrKlang-64bit-1.6.0\include;$(ProjectDir)include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -160,8 +184,16 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>irrKlang.lib;opencv_world4120.lib;$(CoreLibraryDependencies);%(AdditionalDependencies);$(ProjectDir)lib\irrKlang.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\libs\irrKlang-64bit-1.6.0\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;C:\libs\irrKlang-64bit-1.6.0\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="lighting_shader.frag" />
