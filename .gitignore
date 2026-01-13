@@ -362,3 +362,17 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /vcpkg_installed
+
+# --- allow 3D asset OBJ files (models), keep ignoring build *.obj ---
+!resources/objects/
+!resources/objects/**
+
+!resources/objects/**/*.obj
+!resources/objects/**/*.OBJ
+!resources/objects/**/*.mtl
+!resources/objects/**/*.png
+!resources/objects/**/*.jpg
+!resources/objects/**/*.jpeg
+!resources/objects/**/*.tga
+!resources/objects/**/*.bmp
+
