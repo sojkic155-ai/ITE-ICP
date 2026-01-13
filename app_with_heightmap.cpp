@@ -130,10 +130,7 @@ bool App::init()
     engine = irrklang::createIrrKlangDevice();
     if (!engine)
         throw std::exception("Can not create 3D sound device");
-    BackgroundEngine = irrklang::createIrrKlangDevice();
-    if (!BackgroundEngine)
-        throw std::exception("Can not create background sound device");
-
+    BackgroundEngine = engine;
     
     if (!tracker.init(0)) return -1; // camera index 0
 
@@ -509,6 +506,11 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
                 app->my_shader.setUniform("lights[1].diffuseM", glm::vec3(0.0f, 0.0f, 0.0f));
                 app->my_shader.setUniform("lights[1].specularM", glm::vec3(0.0f, 0.0f, 0.0f));
             }
+            break;
+        case GLFW_KEY_T:
+            app->face_control_enabled = !app->face_control_enabled;
+            std::cout << "[FaceControl] " << (app->face_control_enabled ? "ENABLED" : "DISABLED")
+                << " (target_px=" << app->face_control_target_px << ")\n";
             break;
         case GLFW_KEY_N:    // Change day/night
             if (app->night == FALSE) {//set to night
@@ -1018,12 +1020,32 @@ int App::run(void)
         if (auto res = tracker.getLatest(last_seq)) {
             if (res->face_found) {
                 std::cout << "Face at px: " << res->center_px
-                    << " norm: " << res->center_norm << '\n';
+                    << " norm: " << res->center_norm << " size_px: " << res->face_size_px << '\n';
                 float ndcX = -(res->center_norm.x * 2.0f - 1.0f);
                 float ndcY = 1.0f - res->center_norm.y * 2.0f;
                 glm::vec3 targetPos(ndcX, ndcY, 0.0f); // new position from face tracker
                 float alpha = 0.1f; // smoothing factor: smaller = smoother, slower
                 FaceTracResult = alpha * targetPos + (1.0f - alpha) * FaceTracResult;
+
+                // --- Updated: face-size-based forward/back control (INVERTED) ---
+                // Now: larger face (closer) -> move FORWARD; smaller face (farther) -> move BACKWARD.
+                if (face_control_enabled) {
+                    float faceSize = res->face_size_px;
+                    if (faceSize > 0.0f) {
+                        float target = face_control_target_px;
+                        float dead = face_control_deadzone_px;
+                        // inverted error: positive when face is larger/closer than target
+                        float err = faceSize - target; // positive => closer -> move forward
+                        if (std::fabs(err) > dead) {
+                            float norm = err / target; // normalized error
+                            // increased maximum per-frame movement (clamp wider because speed increased)
+                            float moveAmount = glm::clamp(norm * face_control_speed * static_cast<float>(delta_t), -4.0f, 4.0f);
+                            // apply horizontal movement along camera front; Y handled by ground/collision code
+                            glm::vec3 forwardXZ = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
+                            camera.Position += forwardXZ * moveAmount;
+                        }
+                    }
+                }
             }
         }
         else {
@@ -1172,12 +1194,9 @@ App::~App()
     glDeleteTextures(1, &my_texture);
     if (engine) {
         engine->drop();
-        engine = nullptr;
     }
-    if (BackgroundEngine) {
-        BackgroundEngine->drop();
-        BackgroundEngine = nullptr;
-    }
+    engine = nullptr;
+    BackgroundEngine = nullptr;
     std::cout << "Bye...\n";
 
 }

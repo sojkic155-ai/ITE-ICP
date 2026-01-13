@@ -13,6 +13,7 @@ struct FaceResult {
     bool        face_found = false;             // Was a face detected?
     cv::Point2f center_px{0.f, 0.f};            // Center in pixels
     cv::Point2f center_norm{0.f, 0.f};          // Center normalized to [0,1]
+    float       face_size_px = 0.f;             // Size of detected face (px) - max(width, height)
 };
 
 class FaceTracker {
@@ -62,6 +63,7 @@ private:
     std::atomic<float> lastCenterNormY_{0.f};
     std::atomic<float> lastCenterPixX_{0.f};
     std::atomic<float> lastCenterPixY_{0.f};
+    std::atomic<float> lastFaceSize_{0.f}; // published face size in px
     std::atomic<std::uint64_t> resultSequence_{0}; // incremented on each publish
 
     // Worker loop that grabs frames and publishes results.
@@ -73,5 +75,6 @@ private:
     // Compute center of largest face. Returns true if a face is found.
     bool detectFaceCenter(const cv::Mat& frame,
                           cv::Point2f& center_px,
-                          cv::Point2f& center_norm);
+                          cv::Point2f& center_norm,
+                          float& face_size_px);
 };

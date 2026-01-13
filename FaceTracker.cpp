@@ -46,10 +46,12 @@ FaceResult FaceTracker::detect(const cv::Mat& frame) {
     }
 
     cv::Point2f center_px, center_norm;
-    if (detectFaceCenter(frame, center_px, center_norm)) {
+    float face_size_px = 0.f;
+    if (detectFaceCenter(frame, center_px, center_norm, face_size_px)) {
         result.face_found  = true;
         result.center_px   = center_px;
         result.center_norm = center_norm;
+        result.face_size_px = face_size_px;
     }
     return result;
 }
@@ -94,6 +96,7 @@ std::optional<FaceResult> FaceTracker::getLatest(std::uint64_t& last_seq) const 
             lastCenterPixX_.load(std::memory_order_relaxed),
             lastCenterPixY_.load(std::memory_order_relaxed)
         };
+        r.face_size_px = lastFaceSize_.load(std::memory_order_relaxed);
     }
     return r;
 }
@@ -110,7 +113,8 @@ void FaceTracker::trackerThreadLoop() {
         }
 
         cv::Point2f center_px, center_norm;
-        const bool found = detectFaceCenter(frame, center_px, center_norm);
+        float face_size_px = 0.f;
+        const bool found = detectFaceCenter(frame, center_px, center_norm, face_size_px);
 
         // Publish the latest result atomically
         lastFaceFound_.store(found, std::memory_order_relaxed);
@@ -119,6 +123,9 @@ void FaceTracker::trackerThreadLoop() {
             lastCenterPixY_.store(center_px.y, std::memory_order_relaxed);
             lastCenterNormX_.store(center_norm.x, std::memory_order_relaxed);
             lastCenterNormY_.store(center_norm.y, std::memory_order_relaxed);
+            lastFaceSize_.store(face_size_px, std::memory_order_relaxed);
+        } else {
+            lastFaceSize_.store(0.f, std::memory_order_relaxed);
         }
         resultSequence_.fetch_add(1, std::memory_order_relaxed);
 
@@ -132,7 +139,8 @@ void FaceTracker::trackerThreadLoop() {
 // ------------------------
 bool FaceTracker::detectFaceCenter(const cv::Mat& frame,
                                    cv::Point2f& center_px,
-                                   cv::Point2f& center_norm) {
+                                   cv::Point2f& center_norm,
+                                   float& face_size_px) {
     // Preprocess for robust detection
     cv::Mat gray;
     cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
@@ -161,6 +169,9 @@ bool FaceTracker::detectFaceCenter(const cv::Mat& frame,
         center_px.x / static_cast<float>(frame.cols),
         center_px.y / static_cast<float>(frame.rows)
     };
+
+    // Use maximum of width/height as a simple "size proxy" (bigger -> closer)
+    face_size_px = static_cast<float>(std::max(face.width, face.height));
     return true;
 }
 

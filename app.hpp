@@ -1,5 +1,8 @@
-// icp.cpp 
 // author: JJ
+// Modified by: Michal Sojka
+
+#pragma once
+
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <unordered_map>
@@ -12,8 +15,6 @@
 #include "Heightmap.hpp"
 #include "FaceTracker.hpp"
 
-
-#pragma once
 
 
 class App {
@@ -100,6 +101,11 @@ private:
     Model projectile;
     glm::vec3 FaceTracResult = glm::vec3(0.0f, 0.0f, 0.0f);
     
+    // ---- Face-control parameters ----
+    bool face_control_enabled = false;         // toggle face-based movement (default off)
+    float face_control_target_px = 200.0f;     // desired face size in px (tunable)
+    float face_control_deadzone_px = 15.0f;    // deadzone in px (no movement if within)
+    float face_control_speed = 20.0f;          // movement gain (units per second when error==target) -- increased
 
 protected:
     cv::VideoCapture capture;  // global variable, move to app class, protected
