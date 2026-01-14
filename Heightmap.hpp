@@ -10,7 +10,7 @@
 #include "assets.hpp"
 #include "Mesh.hpp"
 #include "ShaderProgram.hpp"
-#define STB_IMAGE_IMPLEMENTATION
+// #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 class Heightmap {
@@ -65,9 +65,9 @@ public:
             {                
                 // computing normals from height differences
                 int xm = std::max(i - 1, 0);
-                int xp = std::min(i + 1, (int)height - 1);
+                int xp = std::min(i + 1, height - 1);
                 int zm = std::max(j - 1, 0);
-                int zp = std::min(j + 1, (int)width - 1);
+                int zp = std::min(j + 1, width - 1);
 
                 // Heights
                 auto getHeight = [&](int row, int col) {
@@ -105,19 +105,19 @@ public:
 
         // 3. index generation
         std::vector<GLuint> indices;
-        for (GLuint i = 0; i < height - 1; i++)       // for each row a.k.a. each strip
+        for (int i = 0; i < height - 1; ++i)       // for each row a.k.a. each strip
         {
-            for (GLuint j = 0; j < width; j++)      // for each column
+            for (int j = 0; j < width; ++j)      // for each column
             {
-                for (GLuint k = 0; k < 2; k++)      // for each side of the strip
+                for (int k = 0; k < 2; ++k)      // for each side of the strip
                 {
-                    indices.push_back(j + width * (i + k));
+                    indices.push_back(static_cast<GLuint>(j + width * (i + k)));
                 }
             }
         }
 
-        NUM_STRIPS = height - 1;
-        NUM_VERTS_PER_STRIP = width * 2;
+        NUM_STRIPS = static_cast<GLuint>(height - 1);
+        NUM_VERTS_PER_STRIP = static_cast<GLuint>(width * 2);
 
         Mesh Mesh(GL_TRIANGLE_STRIP, shader, vertices, indices, origin, orientation, texture_id, NUM_STRIPS, NUM_VERTS_PER_STRIP);
         /* Mesh mesh( primitive type, shader to use, vertex list, index list,

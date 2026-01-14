@@ -28,7 +28,7 @@ public:
     void updateFPS(void);
     void update_projection_matrix(void);
     void switch_to_fullscreen(void);
-    float getTerrainHeight(float x, float z, const std::vector<std::vector<float>>& heightmap);
+    float getTerrainHeight(float x, float z, const std::vector<std::vector<float>>& heightmap) const;
 
     //------ For textures ------
     GLuint textureInit(const std::filesystem::path& file_name);

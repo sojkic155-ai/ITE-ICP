@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include "app.hpp"
-//#include "capture_device.cpp"
 
 // define our application
 App app;

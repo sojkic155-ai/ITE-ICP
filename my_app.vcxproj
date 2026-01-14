@@ -203,14 +203,21 @@
     <None Include="vcpkg.json" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="app_with_heightmap.cpp" />
+    <ClCompile Include="AppAssets.cpp" />
+    <ClCompile Include="AppEvents.cpp" />
+    <ClCompile Include="AppInit.cpp" />
+    <ClCompile Include="AppUtils.cpp" />
+    <ClCompile Include="AppMain.cpp" />
     <ClCompile Include="FaceTracker.cpp" />
     <ClCompile Include="gl_err_callback.cpp" />
     <ClCompile Include="OBJloader.cpp" />
     <ClCompile Include="ShaderProgram.cpp" />
+    <ClCompile Include="stb_image_impl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.hpp" />
+    <ClInclude Include="AppEvents.hpp" />
+    <ClInclude Include="AppUtils.hpp" />
     <ClInclude Include="assets.hpp" />
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="FaceTracker.hpp" />

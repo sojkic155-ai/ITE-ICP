@@ -3,6 +3,7 @@
 #include <iostream> 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 #include <glm/glm.hpp> 
 #include <glm/ext.hpp>
@@ -103,13 +104,18 @@ public:
         glBindVertexArray(VAO);
 
         if (primitive_type == GL_TRIANGLE_STRIP) {
+            // GLsizei expected for count; cast from GLuint to avoid C4267 warning on x64
+            GLsizei vertsPerStrip = static_cast<GLsizei>(NUM_VERTS_PER_STRIP);
             for (GLuint strip = 0; strip < NUM_STRIPS; ++strip)
             {
-                glDrawElements(GL_TRIANGLE_STRIP, NUM_VERTS_PER_STRIP, GL_UNSIGNED_INT, (void*)(sizeof(unsigned int)* NUM_VERTS_PER_STRIP* strip));
+                // pointer offset must be a void*; compute with uintptr_t for 64-bit safety
+                uintptr_t offset = static_cast<uintptr_t>(sizeof(unsigned int)) * static_cast<uintptr_t>(NUM_VERTS_PER_STRIP) * static_cast<uintptr_t>(strip);
+                glDrawElements(GL_TRIANGLE_STRIP, vertsPerStrip, GL_UNSIGNED_INT, reinterpret_cast<void*>(offset));
             }  
         }
         else {
-            glDrawElements(primitive_type, indices.size(), GL_UNSIGNED_INT, 0);
+            // cast indices.size() (size_t) to GLsizei to silence C4267
+            glDrawElements(primitive_type, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
         }
     }
 
@@ -142,6 +148,5 @@ private:
     // ID = 0 is reserved (i.e. uninitalized)
      unsigned int VAO{0}, VBO{0}, EBO{0};
 };
-  
 
 
