@@ -80,10 +80,9 @@ int App::run(void)
     my_shader.setUniform("N_matrix", Ground.normal_matrix); //Needed for light calculations
 
     brightness = 10;
-    // fallback pozice pokud Lamp není v scene
+
     float terrainY = getTerrainHeight(13.5f, 17.5f, Ground.heightmap);
 
-    // spočítat lampTopWorldPos v scope run()
     glm::vec3 lampTopWorldPos(13.5f, terrainY + 19.0f, 20.5f); // fallback
     auto itLamp = scene.find("Lamp");
     if (itLamp != scene.end()) {
@@ -95,7 +94,7 @@ int App::run(void)
         if (maxY != -std::numeric_limits<float>::infinity()) {
             lampTopWorldPos.x = lampModel.origin.x;
             lampTopWorldPos.z = lampModel.origin.z;
-            lampTopWorldPos.y = lampModel.origin.y + maxY * lampModel.scale.y - 0.15f; // malý offset pod vrcholem
+            lampTopWorldPos.y = lampModel.origin.y + maxY * lampModel.scale.y - 0.15f;
         }
     }
 
@@ -151,12 +150,12 @@ int App::run(void)
         else if (i == 4) {
             my_shader.setUniform("lights[4].position", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
             my_shader.setUniform("lights[4].ambientM", glm::vec3(0.0f));
-            my_shader.setUniform("lights[4].diffuseM", glm::vec3(1.0f, 1.0f, 0.95f)); // teplé bílé
+            my_shader.setUniform("lights[4].diffuseM", glm::vec3(1.0f, 1.0f, 0.95f));
             my_shader.setUniform("lights[4].specularM", glm::vec3(1.0f, 1.0f, 0.95f));
             my_shader.setUniform("lights[4].consAttenuation", 1.0f);
             my_shader.setUniform("lights[4].linAttenuation", 0.02f);
             my_shader.setUniform("lights[4].quadAttenuation", 0.005f);
-            my_shader.setUniform("lights[4].cutoff", 25.0f); // úhel kužele v stupních
+            my_shader.setUniform("lights[4].cutoff", 25.0f);
             my_shader.setUniform("lights[4].direction", glm::vec3(0.0f, -1.0f, 0.0f));
             my_shader.setUniform("lights[4].exponent", 40.0f);
         }
@@ -180,7 +179,7 @@ int App::run(void)
     double last_ouch_time = -10.0;
     double last_glass_time = -10.0;
     if (planeSound) {
-        planeSound->setMinDistance(20.0f);   // vzdálenost pro plné slyšení
+        planeSound->setMinDistance(20.0f);
         planeSound->setVolume(10.0f);
         planeSound->setIsPaused(false);
     }
@@ -217,7 +216,6 @@ int App::run(void)
         glfwSetWindowTitle(window, std::string("FPS: ").append(std::to_string(fps)).append(" Vsync: ").append(std::to_string(vsync_on)).c_str());   //Set the window title to show current FPS of the application and if Vsync is active or not
         glfwSetWindowSizeCallback(window,framebuffer_size_callback);
 
-        //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);   // Set background color
         if (night) {
             glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
         }
@@ -226,13 +224,12 @@ int App::run(void)
 
         double current_frame_time = glfwGetTime(); //Needed for FPS calculation
 
-        double delta_t = current_frame_time - last_frame_time; // render time of the last frame 
+        double delta_t = current_frame_time - last_frame_time; 
         last_frame_time = current_frame_time;
 
-        // uložit předchozí pozici kamery pro rollback pokud dojde ke kolizi
         glm::vec3 prevCameraPos = camera.Position;
 
-        camera.ProcessInput(window, static_cast<float>(delta_t)); // process keys etc.
+        camera.ProcessInput(window, static_cast<float>(delta_t)); 
 
         // --- Process ground colision ---
         float terrainY = getTerrainHeight(camera.Position.x, camera.Position.z, Ground.heightmap);
@@ -246,8 +243,8 @@ int App::run(void)
             camera.onground = false;
         }
 
-        // --- jednoduchá kolize kamera vs modely (sphere-AABB) ---
-        const float cameraRadius = 0.75f; // upravte podle velikosti "hlavy"
+        // ---  (sphere-AABB) ---
+        const float cameraRadius = 0.75f;
         bool collision = false;
         std::string collidedName;
         glm::vec3 collidedPos(0.0f);
@@ -263,14 +260,14 @@ int App::run(void)
         }
 
         if (collision) {
-            // rollback kamery
+            // camera rollback
             camera.Position = prevCameraPos;
             camera.Velocity = glm::vec3(0.0f);
 
             if (!collidedName.empty()) {
                 double now = glfwGetTime();
 
-                // kolize s kaktusem -> ouch
+                // collision with cactus -> ouch
                 if (collidedName.rfind("Cactus:", 0) == 0) {
                     const double ouchCooldown = 1.5; // s
                     if (!mute && (now - last_ouch_time) > ouchCooldown) {
@@ -280,7 +277,7 @@ int App::run(void)
                         last_ouch_time = now;
                     }
                 }
-                // kolize s transparentním modelem -> glass hit
+                // collision with transparent model -> glass hit
                 else if (collidedName == "trasparent_block") {
                     const double glassCooldown = 1.5; // s
                     if (!mute && (now - last_glass_time) > glassCooldown) {
@@ -308,27 +305,24 @@ int App::run(void)
 
         // --- make lights[3] red and blinking ---
         {
-            // parametry vzoru
-            const double blinkOn = 0.12;   // délka jednoho "on" v sekundách
-            const double blinkGap = 0.12;  // mezera mezi bliknutími
-            const double offDuration = 3.0; // pauza mezi dvojicemi bliknutí
-            const double seqDuration = 2.0 * (blinkOn + blinkGap); // délka sekvence 2 bliknutí (včetně mezer)
-            const double cycle = seqDuration + offDuration; // celkový cyklus
+            const double blinkOn = 0.12;   
+            const double blinkGap = 0.12;
+            const double offDuration = 3.0;
+            const double seqDuration = 2.0 * (blinkOn + blinkGap);
+            const double cycle = seqDuration + offDuration;
 
             double t = glfwGetTime();
             double phase = std::fmod(t, cycle);
 
             bool on = false;
-            // první bliknutí: [0, blinkOn)
+
             if (phase < blinkOn) {
                 on = true;
             }
-            // mezera po prvním bliknutí: [blinkOn, blinkOn+blinkGap) -> off
-            // druhé bliknutí: [blinkOn+blinkGap, blinkOn+blinkGap+blinkOn)
+
             else if (phase >= (blinkOn + blinkGap) && phase < (2.0 * blinkOn + blinkGap)) {
                 on = true;
             }
-            // jinak off (včetně offDuration)
 
             float blinkFactor = on ? 1.0f : 0.0f;
 
@@ -370,31 +364,27 @@ int App::run(void)
             music = nullptr;
         }
                         
-        // draw all models in the scene
+        // Terrain draw uses opposite winding.
         glFrontFace(GL_CW);
         Ground.draw(translate, rotate, scale);
         glFrontFace(GL_CCW);
 
 
-        // Only poll tracker results when face-control is enabled and worker is running.
+        // Optional face-control: uses detected face size to move camera forward/backward.
         if (face_control_enabled && tracker.workerRunning()) {
             if (auto res = tracker.getLatest(last_seq)) {
                 if (res->face_found) {
-                    // volitelný debug / smooth (ponechat pokud chceš vizuální feedback)
                     std::cout << "Face at px: " << res->center_px
                         << " norm: " << res->center_norm << " size_px: " << res->face_size_px << '\n';
                     float ndcX = -(res->center_norm.x * 2.0f - 1.0f);
                     float ndcY = 1.0f - res->center_norm.y * 2.0f;
                     glm::vec3 targetPos(ndcX, ndcY, 0.0f);
-                    float alpha = 0.1f; // smoothing faktor
+                    float alpha = 0.1f; // smoothing factor
                     FaceTracResult = alpha * targetPos + (1.0f - alpha) * FaceTracResult;
 
-                    // --- face-size řízený pohyb vpřed/vzad (pouze posun, NE rotace kamery) ---
                     if (face_control_enabled) {
                         float error = res->face_size_px - face_control_target_px;
                         if (std::abs(error) > face_control_deadzone_px) {
-                            // error > 0 => tvář větší (blíže) => jít dopředu (dirSign = +1)
-                            // error < 0 => tvář menší (dál) => jít dozadu (dirSign = -1)
                             float dirSign = (error > 0.0f) ? 1.0f : -1.0f;
                             glm::vec3 front_xz = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
                             camera.Position += front_xz * (face_control_speed * dirSign) * static_cast<float>(delta_t);
@@ -403,11 +393,12 @@ int App::run(void)
                 }
             }
         }
-                
+        
+        // Draw non-transparent models first; collect transparent ones for later sorting.
         transparent.clear();
-        // FIRST PART - draw all non-transparent in any order
+
         for (auto& [name, model] : scene) {
-            my_shader.setUniform("N_matrix", model.normal_matrix); //Needed for light calculations
+            my_shader.setUniform("N_matrix", model.normal_matrix);
             if (!model.transparent) {
                 if (name == "my_first_object") {
                     tile_offset = glm::vec2(4.0f * tile_size, 0.0f * tile_size);
@@ -436,32 +427,27 @@ int App::run(void)
                     model.draw(translate, rotate, scale);
                 }
                 else if (name.rfind("throwable_rock", 0) == 0) {
-                    // Pokud má projektil nenulovou rychlost, považujeme ho za "ve vzduchu" a aktualizujeme fyziku
+                    // Projectiles get simple physics until they "land" on terrain.
                     const float velocityEps = 1e-4f;
                     bool inAir = glm::length(model.velocity) > velocityEps;
 
                     if (inAir) {
-                        // Integrace ve více sub-krocích, aby se zabránilo "tunnelingu"
                         float remaining = static_cast<float>(delta_t);
                         const float maxStep = 0.02f; // 20 ms per physics substep
                         bool landed = false;
 
                         while (remaining > 0.0f && !landed) {
                             float step = std::min(remaining, maxStep);
-                            // flyghtpath musí akceptovat malý časový krok (step)
                             model.flyghtpath(step, FaceTracResult);
                             remaining -= step;
 
                             // check collision with terrain at current XY
                             float groundY = getTerrainHeight(model.origin.x, model.origin.z, Ground.heightmap);
-                            const float groundEps = 0.01f; // drobný offset nad terénem
+                            const float groundEps = 0.01f;
                             if (model.origin.y <= groundY + groundEps) {
-                                // projektil dopadl -> posaď ho přesně na terén, zastav a označ jako pevný objekt
                                 model.origin.y = groundY + groundEps;
                                 model.velocity = glm::vec3(0.0f);
                                 landed = true;
-
-                                // nechme kámen zůstat ve scéně jako pevný objekt (může kolidovat s hráčem)
                                 model.solid = true;
                                 model.computeAABB();
                             }
@@ -470,7 +456,6 @@ int App::run(void)
                         model.draw(translate, rotate, scale);
                     }
                     else {
-                        // projektil už dopadl — vykreslovat staticky (bez další fyziky)
                         model.draw(translate, rotate, scale);
                     }
                 }
@@ -527,7 +512,7 @@ int App::run(void)
         glfwPollEvents();
     }
 
-    // ensure worker stopped if it was running
+    // Shutdown worker and window resources.
     if (tracker.workerRunning()) tracker.stopWorker();
 
     // Close OpenGL window if opened and terminate GLFW
@@ -540,7 +525,7 @@ int App::run(void)
 
 App::~App()
 {
-    // clean-up
+    // Cleanup: windowing, GL objects, and audio.
     cv::destroyAllWindows();
     glfwTerminate();
     my_shader.clear();

@@ -7,17 +7,16 @@ static const char* kCascadeFilename = "resources/haarcascade_frontalface_default
 
 
 FaceTracker::~FaceTracker() {
-    // Ensure clean shutdown if the user forgot to stop the worker
+    // Make sure the worker is not left running.
     stopWorker();
 }
 
 bool FaceTracker::init(int camera_index) {
-    // 1) Load detector
+    // Load the cascade and open the camera input.
     if (!faceCascade_.load(kCascadeFilename)) {
         std::cerr << "Failed to load cascade: " << kCascadeFilename << '\n';
         return false;
     }
-    // 2) Open camera
     if (!capture_.open(camera_index)) {
         std::cerr << "Failed to open camera index " << camera_index << '\n';
         return false;
@@ -25,10 +24,9 @@ bool FaceTracker::init(int camera_index) {
     return true;
 }
 
-// ------------------------
-// Single-thread (pull) API
-// ------------------------
+
 std::optional<FaceResult> FaceTracker::grabAndDetect() {
+    // Grab one frame from the camera and run detection on it.
     if (!capture_.isOpened()) return std::nullopt;
 
     cv::Mat frame;
@@ -40,6 +38,7 @@ std::optional<FaceResult> FaceTracker::grabAndDetect() {
 }
 
 FaceResult FaceTracker::detect(const cv::Mat& frame) {
+    // Detect the largest face and return its center (px + normalized).
     FaceResult result;
     if (frame.empty() || faceCascade_.empty()) {
         return result; // face_found remains false
@@ -56,10 +55,9 @@ FaceResult FaceTracker::detect(const cv::Mat& frame) {
     return result;
 }
 
-// ------------------------
-// Multithreaded (worker) API
-// ------------------------
+
 bool FaceTracker::startWorker() {
+    // Start a background thread that keeps grabbing frames and publishing results.
     if (!capture_.isOpened() || workerIsRunning_.load(std::memory_order_relaxed)) {
         return false;
     }
@@ -72,6 +70,7 @@ bool FaceTracker::startWorker() {
 }
 
 void FaceTracker::stopWorker() {
+    // Ask worker to stop and wait for it (safe to call multiple times).
     if (!workerIsRunning_.load(std::memory_order_relaxed)) return;
     stopRequested_.store(true, std::memory_order_relaxed);
     if (workerThread_.joinable()) workerThread_.join();
@@ -79,6 +78,7 @@ void FaceTracker::stopWorker() {
 }
 
 std::optional<FaceResult> FaceTracker::getLatest(std::uint64_t& last_seq) const {
+    // Return a result only if it changed since the last poll (sequence-based).
     const auto current_seq = resultSequence_.load(std::memory_order_relaxed);
     if (current_seq == last_seq) {
         return std::nullopt; // no new result since last poll
@@ -101,10 +101,9 @@ std::optional<FaceResult> FaceTracker::getLatest(std::uint64_t& last_seq) const 
     return r;
 }
 
-// ------------------------
-// Worker internals
-// ------------------------
+
 void FaceTracker::trackerThreadLoop() {
+    // Worker loop: read frame -> detect -> publish latest result.
     while (!stopRequested_.load(std::memory_order_relaxed)) {
         cv::Mat frame;
         if (!capture_.read(frame) || frame.empty()) {
@@ -134,14 +133,12 @@ void FaceTracker::trackerThreadLoop() {
     }
 }
 
-// ------------------------
-// Helpers
-// ------------------------
+
 bool FaceTracker::detectFaceCenter(const cv::Mat& frame,
                                    cv::Point2f& center_px,
                                    cv::Point2f& center_norm,
                                    float& face_size_px) {
-    // Preprocess for robust detection
+    // Detect faces and compute the center of the largest one.
     cv::Mat gray;
     cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
     cv::equalizeHist(gray, gray);
@@ -176,6 +173,7 @@ bool FaceTracker::detectFaceCenter(const cv::Mat& frame,
 }
 
 cv::Rect FaceTracker::largestFace(const std::vector<cv::Rect>& faces) {
+    // Pick the face rectangle with the biggest area.
     return *std::max_element(
         faces.begin(), faces.end(),
         [](const cv::Rect& a, const cv::Rect& b) { return a.area() < b.area(); }
