@@ -31,33 +31,81 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             break;
 
         case GLFW_KEY_TAB: // toggle fullscreen/windowed
-            if (app->fullscreen == FALSE) {
+            if (!app->fullscreen) {
                 app->switch_to_fullscreen();
-                app->fullscreen = TRUE;
+                app->fullscreen = true;
             }
             else {
-                glfwSetWindowMonitor(window, app->last_window_monitor, app->last_window_xpos,
-                    app->last_window_ypos, app->last_window_width, app->last_window_height, GLFW_DONT_CARE);
-                app->fullscreen = FALSE;
+                // restore windowed mode using saved placement
+                glfwSetWindowMonitor(window, app->last_window_monitor,
+                                     app->last_window_xpos, app->last_window_ypos,
+                                     app->last_window_width, app->last_window_height,
+                                     GLFW_DONT_CARE);
+
+                glfwPollEvents();
+
+                int fbw = 0, fbh = 0;
+                glfwGetFramebufferSize(window, &fbw, &fbh);
+                int ww = 0, wh = 0;
+                glfwGetWindowSize(window, &ww, &wh);
+
+                app->width = fbw > 0 ? fbw : app->last_window_width;
+                app->height = fbh > 0 ? fbh : app->last_window_height;
+                glViewport(0, 0, app->width, app->height);
+                app->update_projection_matrix();
+
+                glfwSetInputMode(window, GLFW_CURSOR, app->cursor_state ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+
+                double cx = static_cast<double>(ww) / 2.0;
+                double cy = static_cast<double>(wh) / 2.0;
+                glfwSetCursorPos(window, cx, cy);
+                app->cursorLastX = cx;
+                app->cursorLastY = cy;
+                app->ignore_mouse_delta = true;
+
+                glfwPollEvents();
+
+                app->fullscreen = false;
             }
             break;
 
         case GLFW_KEY_C: // toggle cursor lock
-            if (app->cursor_state == FALSE) {
+        {
+            app->cursor_state = !app->cursor_state;
+
+            double cx = 0.0, cy = 0.0;
+
+            if (app->cursor_state) {
+                // enable cursor
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                app->cursor_state = TRUE;
+                glfwGetCursorPos(window, &cx, &cy);
             }
             else {
+                // disable cursor
+                int w = 0, h = 0;
+                glfwGetWindowSize(window, &w, &h);
+                if (w <= 0 || h <= 0) {
+                    glfwGetFramebufferSize(window, &w, &h);
+                }
+                cx = static_cast<double>(w) / 2.0;
+                cy = static_cast<double>(h) / 2.0;
+                glfwSetCursorPos(window, cx, cy);
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                app->cursor_state = FALSE;
             }
-            break;
+
+            app->cursorLastX = cx;
+            app->cursorLastY = cy;
+            app->ignore_mouse_delta = true;
+
+            glfwPollEvents();
+        }
+        break;
 
         case GLFW_KEY_M: // mute/unmute audio
             app->mute = !app->mute;
             break;
 
-        case GLFW_KEY_F: // toggle flashlight (2nd light slot)
+        case GLFW_KEY_F: // toggle flashlight
             if (app->flashlight == FALSE) {
                 app->flashlight = TRUE;
                 app->brightness = 10.0f;
@@ -73,7 +121,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             }
             break;
 
-        case GLFW_KEY_T: // toggle face-based control flag (does not start/stop any worker)
+        case GLFW_KEY_T: // toggle face-based control
             app->face_control_enabled = !app->face_control_enabled;
             std::cout << "[FaceControl] " << (app->face_control_enabled ? "ENABLED" : "DISABLED")
                 << " (target_px=" << app->face_control_target_px << ")\n";
@@ -143,21 +191,76 @@ void App::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 void App::switch_to_fullscreen(void) {
-    // Switch to fullscreen and store previous window placement so we can restore it later.
-    last_window_monitor = glfwGetWindowMonitor(window);
+    // Switch to fullscreen
+    glfwGetWindowPos(window, &last_window_xpos, &last_window_ypos);
     glfwGetWindowSize(window, &last_window_width, &last_window_height);
 
-    // NOTE: this should probably be (&last_window_xpos, &last_window_ypos).
-    glfwGetWindowPos(window, &last_window_xpos, &last_window_xpos);
+    // Record current monitor
+    last_window_monitor = glfwGetWindowMonitor(window);
 
-    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    // Monitor - window center (multi-monitor).
+    int wx, wy, ww, wh;
+    glfwGetWindowPos(window, &wx, &wy);
+    glfwGetWindowSize(window, &ww, &wh);
+    int centerX = wx + ww / 2;
+    int centerY = wy + wh / 2;
+
+    int count = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&count);
+    GLFWmonitor* target = glfwGetPrimaryMonitor(); // fallback
+
+    for (int i = 0; i < count; ++i) {
+        int mx = 0, my = 0;
+        glfwGetMonitorPos(monitors[i], &mx, &my);
+        const GLFWvidmode* vm = glfwGetVideoMode(monitors[i]);
+        if (!vm) continue;
+        int mw = vm->width;
+        int mh = vm->height;
+        if (centerX >= mx && centerX < mx + mw && centerY >= my && centerY < my + mh) {
+            target = monitors[i];
+            break;
+        }
+    }
+
+    // Switch to fullscreen on chosen monitor.
+    const GLFWvidmode* mode = glfwGetVideoMode(target);
+    if (!mode) {
+        // fallback
+        return;
+    }
+
+    glfwSetWindowMonitor(window, target, 0, 0, mode->width, mode->height, mode->refreshRate);
+
+    glfwPollEvents();
+
+    int fbw = 0, fbh = 0;
+    glfwGetFramebufferSize(window, &fbw, &fbh);
+    width = fbw > 0 ? fbw : mode->width;
+    height = fbh > 0 ? fbh : mode->height;
+
+    int ww_after = 0, wh_after = 0;
+    glfwGetWindowSize(window, &ww_after, &wh_after);
+    double cx = static_cast<double>(ww_after) / 2.0;
+    double cy = static_cast<double>(wh_after) / 2.0;
+    glfwSetCursorPos(window, cx, cy);
+    cursorLastX = cx;
+    cursorLastY = cy;
+    ignore_mouse_delta = true;
+
+    glViewport(0, 0, width, height);
+    update_projection_matrix();
 }
 
 void App::cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     // Mouse look: convert cursor delta into yaw/pitch input.
     auto app = static_cast<App*>(glfwGetWindowUserPointer(window));
+
+    if (app->ignore_mouse_delta) {
+        app->cursorLastX = xpos;
+        app->cursorLastY = ypos;
+        app->ignore_mouse_delta = false;
+        return;
+    }
 
     // Explicit cast (double -> GLfloat) to avoid precision-loss warnings.
     GLfloat dx = static_cast<GLfloat>(xpos - app->cursorLastX);

@@ -93,6 +93,9 @@ private:
     double cursorLastX{ 0 };
     double cursorLastY{ 0 };
 
+    // Ignore a single mouse-delta after mode switch to avoid camera jump.
+    bool ignore_mouse_delta = false;
+
     //------ Fullscreen bookkeeping ------
     // Save last windowed placement so we can return from fullscreen.
     int last_window_xpos = 0;
