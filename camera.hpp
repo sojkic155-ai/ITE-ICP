@@ -50,8 +50,12 @@ public:
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) direction += -Right;
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) direction += Right;
 
-        // Jump only when grounded.
-        if (onground && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        // detect modifiers
+        bool walk = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+        bool crouch = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
+
+        // Jump only when grounded and not crouching.
+        if (onground && !crouch && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
         {
             Velocity.y = 7.0f;  // jump impulse
             onground = false;
@@ -65,8 +69,14 @@ public:
         // Move only in XZ plane (no flying when looking up/down).
         if (direction != glm::vec3{ 0 }) {
             direction = glm::normalize(glm::vec3(direction.x, 0.0f, direction.z));
-            Velocity.x = direction.x * MovementSpeed;
-            Velocity.z = direction.z * MovementSpeed;
+
+            // compute effective speed modifier: crouch strongest, walk milder
+            float speedMult = 1.0f;
+            if (crouch) speedMult = 0.25f;   // crouch -> slow
+            else if (walk) speedMult = 0.4f; // walk -> slower than run
+
+            Velocity.x = direction.x * MovementSpeed * speedMult;
+            Velocity.z = direction.z * MovementSpeed * speedMult;
         }
         else {
             Velocity.x = 0.0f;

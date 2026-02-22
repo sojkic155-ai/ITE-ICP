@@ -12,6 +12,7 @@
 #include <cstdlib>  // For rand() and srand()
 #include <ctime>    // For time()
 #include <atomic>
+#include <algorithm>
 
 #include "assets.hpp"
 #include "app.hpp"
@@ -203,7 +204,8 @@ int App::run(void)
         music->setIsPaused(false);
     }
 
-    float eyeHeight = 1.8f;
+    // eye height is now a member (supports crouch)
+    // default standing value already set in App::eyeHeightStanding / eyeHeight
     // Start background worker (restore original behavior)
     if (!tracker.startWorker()) return -1;
     std::uint64_t last_seq = 0;
@@ -229,18 +231,40 @@ int App::run(void)
 
         glm::vec3 prevCameraPos = camera.Position;
 
-        camera.ProcessInput(window, static_cast<float>(delta_t)); 
+        // Update crouch / walk state from keys (CTRL = crouch, SHIFT = walk)
+        bool crouchPressed = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
+        bool walkPressed = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+        this->crouch_pressed = crouchPressed;
+        this->walk_pressed = walkPressed;
+
+        // Smoothly interpolate eye height toward target to avoid instant pop when standing up/down.
+        float targetEye = crouchPressed ? this->eyeHeightCrouch : this->eyeHeightStanding;
+        const float eyeInterpSpeed = 6.0f; // larger = faster transition
+        float t = std::min(1.0f, eyeInterpSpeed * static_cast<float>(delta_t));
+        this->eyeHeight += (targetEye - this->eyeHeight) * t;
+
+        camera.ProcessInput(window, static_cast<float>(delta_t));
 
         // --- Process ground colision ---
         float terrainY = getTerrainHeight(camera.Position.x, camera.Position.z, Ground.heightmap);
-        float minEyeY = terrainY + eyeHeight;
-        if (camera.Position.y < minEyeY) {
-            camera.Position.y = minEyeY;
+        float desiredMinEyeY = terrainY + this->eyeHeight;
+
+        // If on ground and below desired minimal eye Y (e.g. just released crouch), move up smoothly toward desiredMinEyeY.
+        if (camera.onground && camera.Position.y < desiredMinEyeY) {
+            // use same interpolation factor t for a smooth gentle rise
+            camera.Position.y += (desiredMinEyeY - camera.Position.y) * t;
             camera.Velocity.y = 0.0f;
+            // keep marked as grounded while adjusting
             camera.onground = true;
         }
         else {
-            camera.onground = false;
+            // preserve previous grounded/air state based on comparison with desiredMinEyeY
+            if (camera.Position.y <= desiredMinEyeY + 0.001f) {
+                camera.onground = true;
+            }
+            else {
+                camera.onground = false;
+            }
         }
 
         // ---  (sphere-AABB) ---

@@ -137,6 +137,14 @@ private:
     float face_control_deadzone_px = 15.0f;    // deadzone in px (no movement if within)
     float face_control_speed = 20.0f;          // movement gain (units per second)
 
+    //------ Movement extras: crouch / walk ------
+    // CTRL = crouch (lower eye height + slower speed), SHIFT = walk (slower speed)
+    bool crouch_pressed = false;
+    bool walk_pressed = false;
+    float eyeHeightStanding = 1.8f;
+    float eyeHeightCrouch = 1.0f;
+    float eyeHeight = 1.8f;
+
 protected:
     // Video capture device used by FaceTracker (kept protected for potential subclass access).
     cv::VideoCapture capture;
