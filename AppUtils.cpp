@@ -12,7 +12,7 @@ void App::update_projection_matrix() {  //Update the projection matrix
     float ratio = static_cast<float>(width) / height;
 
     projection_matrix = glm::perspective(
-        glm::radians(45.0f), // The vertical Field of View
+        glm::radians(fov), // use current member FOV (degrees) instead of fixed 45.0f
         ratio,               // Aspect Ratio
         0.1f,                // Near clipping plane
         300.0f               // Far clipping plane

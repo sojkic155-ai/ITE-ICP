@@ -280,8 +280,17 @@ void App::cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 }
 
 void App::mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    // Mouse button handler: currently used to spawn a projectile on left click.
+    // Mouse button handler: currently used to spawn a projectile on left click and zoom on right click.
     auto app = static_cast<App*>(glfwGetWindowUserPointer(window));
+
+    // Right mouse button: enable/disable zoom while held.
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        if (action == GLFW_PRESS) {
+            app->right_mouse_down = true;
+        } else if (action == GLFW_RELEASE) {
+            app->right_mouse_down = false;
+        }
+    }
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         std::cout << "[DEBUG] Mouse left pressed." << std::endl;

@@ -63,6 +63,11 @@ public:
     static constexpr double kOuchCooldown = 1.5;
     static constexpr double kGlassCooldown = 1.5;
 
+    // Camera zoom parameters
+    static constexpr float kDefaultFov = 45.0f;      // default field of view (degrees)
+    static constexpr float kZoomedFov = 25.0f;       // FOV while zooming (degrees)
+    static constexpr float kFovLerpSpeed = 8.0f;     // how fast FOV interpolates per second
+
     // App entry point object: constructor sets up default state, real heavy init belongs in init().
     App();
 
@@ -114,6 +119,7 @@ private:
     bool night = false;
     bool flashlight = false;
     bool leftclick = false;
+    bool right_mouse_down = false; 
     float brightness = 0.0f;
 
     //------ GLFW callbacks ------

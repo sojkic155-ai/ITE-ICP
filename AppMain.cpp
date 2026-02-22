@@ -129,7 +129,7 @@ int App::run(void)
             my_shader.setUniform("lights[1].linAttenuation", 0.09f);
             my_shader.setUniform("lights[1].quadAttenuation", 0.032f);
             my_shader.setUniform("lights[1].cutoff", 20.0f);
-            my_shader.setUniform("lights[1].direction", camera.Front);
+            my_shader.setUniform("lights[1].direction", glm::normalize(camera.Front));
             my_shader.setUniform("lights[1].exponent", 20.0f);
         }
         else if (i == 2) {
@@ -248,6 +248,18 @@ int App::run(void)
         double current_frame_time = glfwGetTime();
         double delta_t = current_frame_time - last_frame_time; 
         last_frame_time = current_frame_time;
+
+        // Smoothly interpolate FOV toward target if RMB is held (zoom).
+        {
+            float targetFov = right_mouse_down ? App::kZoomedFov : App::kDefaultFov;
+            float diff = targetFov - fov;
+            if (std::fabs(diff) > 0.001f) {
+                float lerp = std::min(1.0f, App::kFovLerpSpeed * static_cast<float>(delta_t));
+                fov += diff * lerp;
+                // Recompute projection matrix using new fov
+                update_projection_matrix();
+            }
+        }
 
         // Save previous camera position for collision rollback.
         glm::vec3 prevCameraPos = camera.Position;
