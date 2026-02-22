@@ -54,11 +54,11 @@ void App::init_assets(void) {
     Ground = Heightmap("resources/heightmaps/ground_v1.png", my_shader, ground_tex);
 
     // Random placement config for environment objects.
-    const int numPoints = 75;
-    const int minCoordinate = -100;
-    const int maxCoordinate = 100;
-    const int minborder = -15;
-    const int maxborder = 15;
+    const int numPoints = App::kNumPoints;
+    const int minCoordinate = App::kMinCoordinate;
+    const int maxCoordinate = App::kMaxCoordinate;
+    const int minborder = App::kMinBorder;
+    const int maxborder = App::kMaxBorder;
     glm::vec2 cactuscoords = glm::vec2(0.0f);
 
     std::srand(static_cast<unsigned int>(std::time(0)));
@@ -108,7 +108,7 @@ void App::init_assets(void) {
 
     {
         // Spawn rock_2 instances.
-        const int numRocks = 25;
+        const int numRocks = App::kNumRocks;
         for (int i = 0; i < numRocks; ++i) {
             float x, z;
             do {
@@ -131,7 +131,7 @@ void App::init_assets(void) {
 
     {
         // Spawn rock_3 and rock_4 instances.
-        const int numRock3 = 20;
+        const int numRock3 = App::kNumRock3;
         for (int i = 0; i < numRock3; ++i) {
             float x, z;
             do {
@@ -155,7 +155,7 @@ void App::init_assets(void) {
             scene.insert({ std::string("Rock3:").append(std::to_string(i)).c_str(), rock3Template });
         }
 
-        const int numRock4 = 20;
+        const int numRock4 = App::kNumRock4;
         for (int i = 0; i < numRock4; ++i) {
             float x, z;
             do {

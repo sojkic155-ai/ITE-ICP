@@ -46,8 +46,6 @@ App::App()
 
 int App::run(void)
 {
-    //glfwSetWindowCloseCallback(window, window_close_callback); // Setting the window close callback function so it will be active during runtime
-
     // ------ Enabling the depth test and faceculling (only for the back faces) ------
     glEnable(GL_DEPTH_TEST);
     
@@ -65,8 +63,8 @@ int App::run(void)
     glm::vec4 my_rgba = glm::vec4(r,g,b,a); // Creatiing the vector for the color input of the object
     a = 0.1f;
     glm::vec4 transparent_rgba = glm::vec4(r, g, b, a);
-    float tile_size = 1.0f / 16;            // Size of one tile on the texture atlas
-    glm::vec2 tile_offset = glm::vec2(0.0f* tile_size, 0.0f * tile_size);   // Setting the position of the desired tile of the texture atlas
+    float tile_size = App::kTileSize;            // Size of one tile on the texture atlas
+    glm::vec2 tile_offset = glm::vec2(0.0f * tile_size, 0.0f * tile_size);   // Setting the position of the desired tile of the texture atlas
 
     // Setting variables for the FPS calculations
     double last_frame_time = glfwGetTime();
@@ -76,11 +74,11 @@ int App::run(void)
     my_shader.activate();   // Because we only have one shader
 
     // ----- Setting the parameters of the desired lights. (All parameters needs to be set from the s_lights struct for it to work >.<)------
-    // Currently these parameters generatte a green and a blue pointlight at the top and bottom of the loaded in textured cube
+    // Currently these parameters generrate a green and a blue pointlight at the top and bottom of the loaded in textured cube
     const int maxlights = 4;
     my_shader.setUniform("N_matrix", Ground.normal_matrix); //Needed for light calculations
 
-    brightness = 10;
+    brightness = static_cast<int>(App::kDefaultBrightness);
 
     float terrainY = getTerrainHeight(13.5f, 17.5f, Ground.heightmap);
 
@@ -173,50 +171,58 @@ int App::run(void)
     
     //----- 2D & 3D audio -----    
     // position, playLooped = true, startPaused = true, track = true
-    irrklang::ISound* music = engine->play3D("resources/music/birds.mp3", irrklang::vec3df(0, 0, 0), false, true, true); // loop, start paused, enable 3D sound
-    irrklang::ISound* BackgroundMusic = BackgroundEngine -> play2D("resources/music/Dune_Official _Soundtrack _Pauls_Dream_Hans_Zimmer.mp3", true, true, false); // loop, start paused, enable 3D sound
-    irrklang::ISound* planeSound = engine->play3D("resources/music/plane.mp3",
-    irrklang::vec3df(0.0f, 0.0f, 0.0f), /*looped=*/true, /*startPaused=*/true, /*track=*/true);
+    irrklang::ISound* music = nullptr;
+    irrklang::ISound* BackgroundMusic = nullptr;
+    irrklang::ISound* planeSound = nullptr;
+
+    if (engine) {
+        music = engine->play3D(App::kMusicBirdsPath, irrklang::vec3df(0, 0, 0), false, true, true);
+        if (music) {
+            music->setMinDistance(App::kMusicMinDistance);
+            music->setVolume(App::kMusicVolume);
+            music->setIsPaused(false);
+        }
+        planeSound = engine->play3D(App::kPlaneSoundPath, irrklang::vec3df(0.0f, 0.0f, 0.0f), true, true, true);
+        if (planeSound) {
+            planeSound->setMinDistance(App::kPlaneSoundMinDistance);
+            planeSound->setVolume(App::kPlaneSoundVolume);
+            planeSound->setIsPaused(false);
+        }
+    }
+    if (BackgroundEngine) {
+        BackgroundMusic = BackgroundEngine->play2D(App::kBackgroundMusicPath, true, true, false);
+        if (BackgroundMusic) {
+            // track==false above, so return may be nullptr; if non-null adjust volume and unpause
+            BackgroundMusic->setVolume(App::kBackgroundMusicVolume);
+            BackgroundMusic->setIsPaused(false);
+        }
+    }
+
     double last_ouch_time = -10.0;
     double last_glass_time = -10.0;
-    if (planeSound) {
-        planeSound->setMinDistance(20.0f);
-        planeSound->setVolume(10.0f);
-        planeSound->setIsPaused(false);
-    }
-    // The minimum distance is the distance in which the sound gets played at maximum volume.
-    music->setMinDistance(5.0f); // Make sound source bigger. (Default = 1.0 = "small" sound source.)
-    music->setIsPaused(false); // Start playing
-    
-    if (BackgroundMusic) {
-        std::cout << "Current volume:" << BackgroundMusic->getVolume(); // float, [0.0 to 1.0]
-            // Prepare sound parameters: set volume, effects, etc.
-        BackgroundMusic->setVolume(0.3f);
-        // Unpause
-        BackgroundMusic->setIsPaused(false);
-    }
 
-    if (music) {
-        std::cout << "Current volume:" << music->getVolume(); // float, [0.0 to 1.0]
-        // Prepare sound parameters: set volume, effects, etc.
-        music->setVolume(0.8f);
-        // Unpause
-        music->setIsPaused(false);
-    }
-
-    // eye height is now a member (supports crouch)
-    // default standing value already set in App::eyeHeightStanding / eyeHeight
     // Start background worker (restore original behavior)
-    if (!tracker.startWorker()) return -1;
+    if (!tracker.startWorker()) {
+        // cleanup any created sounds before returning error
+        if (music) { music->stop(); music->drop(); music = nullptr; }
+        if (BackgroundMusic) { BackgroundMusic->stop(); BackgroundMusic->drop(); BackgroundMusic = nullptr; }
+        if (planeSound) { planeSound->stop(); planeSound->drop(); planeSound = nullptr; }
+        return -1;
+    }
     std::uint64_t last_seq = 0;
 
     while (!glfwWindowShouldClose(window)) {    //Main loop of the application
         
-        // Set all the callback functions we want to be active during the runtime of the application (Only the set functions with declaration will be active, just declaring a callback function is not enough)
-        glfwSetCursorPosCallback(window, cursor_position_callback);
-        glfwSetMouseButtonCallback(window, mouse_button_callback);
+        // Set callbacks only once in init; calling them every frame is unnecessary.
+        // Keep existing calls for backward compatibility but guard to avoid overhead.
+        static bool callbacks_set = false;
+        if (!callbacks_set) {
+            glfwSetCursorPosCallback(window, cursor_position_callback);
+            glfwSetMouseButtonCallback(window, mouse_button_callback);
+            glfwSetWindowSizeCallback(window,framebuffer_size_callback);
+            callbacks_set = true;
+        }
         glfwSetWindowTitle(window, std::string("FPS: ").append(std::to_string(fps)).append(" Vsync: ").append(std::to_string(vsync_on)).c_str());   //Set the window title to show current FPS of the application and if Vsync is active or not
-        glfwSetWindowSizeCallback(window,framebuffer_size_callback);
 
         if (night) {
             glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
@@ -294,20 +300,18 @@ int App::run(void)
                 // collision with cactus -> ouch
                 if (collidedName.rfind("Cactus:", 0) == 0) {
                     const double ouchCooldown = 1.5; // s
-                    if (!mute && (now - last_ouch_time) > ouchCooldown) {
-                        engine->play3D("resources/music/ouch.mp3",
-                            irrklang::vec3df(collidedPos.x, collidedPos.y, collidedPos.z),
-                            false, false, false);
+                    if (!mute && (now - last_ouch_time) > ouchCooldown && engine) {
+                        // play3D returns ISound* only when track==true or startPaused==true
+                        // We don't need to track the sound here, so use play3D without tracking.
+                        engine->play3D(App::kOuchPath, irrklang::vec3df(collidedPos.x, collidedPos.y, collidedPos.z), false, false, false);
                         last_ouch_time = now;
                     }
                 }
                 // collision with transparent model -> glass hit
                 else if (collidedName == "trasparent_block") {
                     const double glassCooldown = 1.5; // s
-                    if (!mute && (now - last_glass_time) > glassCooldown) {
-                        engine->play3D("resources/music/wine-glass-hit.mp3",
-                            irrklang::vec3df(collidedPos.x, collidedPos.y, collidedPos.z),
-                            false, false, false);
+                    if (!mute && (now - last_glass_time) > glassCooldown && engine) {
+                        engine->play3D(App::kGlassPath, irrklang::vec3df(collidedPos.x, collidedPos.y, collidedPos.z), false, false, false);
                         last_glass_time = now;
                     }
                 }
@@ -363,23 +367,27 @@ int App::run(void)
         
         // --- set the 3D audio ---
         // move sound source
-        irrklang::vec3df newPosition(20.0, 10.0, 20.0);
-        music->setPosition(newPosition);
+        if (music) {
+            irrklang::vec3df newPosition(20.0, 10.0, 20.0);
+            music->setPosition(newPosition);
+        }
         // move Listener (similar to Camera)
-        irrklang::vec3df position(camera.Position.x, camera.Position.y, camera.Position.z); // position of the listener
-        irrklang::vec3df lookDirection(camera.Front.x, camera.Front.y, camera.Front.z); // the direction the listener looks into
-        irrklang::vec3df velPerSecond(0, 0, 0); // only relevant for doppler effects
-        irrklang::vec3df upVector(camera.Up.x, camera.Up.y, camera.Up.z); // where 'up' is in your 3D scene
-        engine->setListenerPosition(position, lookDirection, velPerSecond, upVector);
+        if (engine) {
+            irrklang::vec3df position(camera.Position.x, camera.Position.y, camera.Position.z); // position of the listener
+            irrklang::vec3df lookDirection(camera.Front.x, camera.Front.y, camera.Front.z); // the direction the listener looks into
+            irrklang::vec3df velPerSecond(0, 0, 0); // only relevant for doppler effects
+            irrklang::vec3df upVector(camera.Up.x, camera.Up.y, camera.Up.z); // where 'up' is in your 3D scene
+            engine->setListenerPosition(position, lookDirection, velPerSecond, upVector);
+        }
 
         if (mute) {
-            music->setIsPaused(true);
-            BackgroundMusic->setIsPaused(true);
+            if (music) music->setIsPaused(true);
+            if (BackgroundMusic) BackgroundMusic->setIsPaused(true);
             if (planeSound) planeSound->setIsPaused(true);
         }
         else {
-            music->setIsPaused(false);
-            BackgroundMusic->setIsPaused(false);
+            if (music) music->setIsPaused(false);
+            if (BackgroundMusic) BackgroundMusic->setIsPaused(false);
             if (planeSound) planeSound->setIsPaused(false);
         }
     
@@ -538,6 +546,23 @@ int App::run(void)
 
     // Shutdown worker and window resources.
     if (tracker.workerRunning()) tracker.stopWorker();
+
+    // Drop any remaining sounds we created/tracked here to avoid leaks.
+    if (music) {
+        if (!music->isFinished()) music->stop();
+        music->drop();
+        music = nullptr;
+    }
+    if (planeSound) {
+        if (!planeSound->isFinished()) planeSound->stop();
+        planeSound->drop();
+        planeSound = nullptr;
+    }
+    if (BackgroundMusic) {
+        if (!BackgroundMusic->isFinished()) BackgroundMusic->stop();
+        BackgroundMusic->drop();
+        BackgroundMusic = nullptr;
+    }
 
     // Close OpenGL window if opened and terminate GLFW
     if (window)

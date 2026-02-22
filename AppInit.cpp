@@ -16,12 +16,12 @@ bool App::init()
     if (!glfwInit())
         return false;
 
-    // Request OpenGL 4.6 core profile.
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    // Request OpenGL core profile from centralized constants.
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, App::kGLMajor);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, App::kGLMinor);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(640, 480, "Prototype app", NULL, NULL);
+    window = glfwCreateWindow(App::kDefaultWindowWidth, App::kDefaultWindowHeight, "Prototype app", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -95,7 +95,8 @@ bool App::init()
     // Enable alpha blending (needed for transparent models/textures).
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    engine = irrklang::createIrrKlangDevice();
+    // Create irrKlang engine with centralized options from App::kIrrKlangOptions.
+    engine = irrklang::createIrrKlangDevice(irrklang::ESOD_AUTO_DETECT, App::kIrrKlangOptions);
     if (!engine)
         throw std::exception("Can not create 3D sound device");
     BackgroundEngine = engine;

@@ -106,15 +106,15 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             break;
 
         case GLFW_KEY_F: // toggle flashlight
-            if (app->flashlight == FALSE) {
-                app->flashlight = TRUE;
-                app->brightness = 10.0f;
+            if (!app->flashlight) {
+                app->flashlight = true;
+                app->brightness = App::kDefaultBrightness;
                 app->my_shader.setUniform("lights[1].ambientM", glm::vec3(0.05f, 0.05f, 0.05f));
                 app->my_shader.setUniform("lights[1].diffuseM", glm::vec3(1.0f * app->brightness, 0.95f * app->brightness, 0.8f * app->brightness));
                 app->my_shader.setUniform("lights[1].specularM", glm::vec3(1.0f * app->brightness, 0.95f * app->brightness, 0.9f * app->brightness));
             }
             else {
-                app->flashlight = FALSE;
+                app->flashlight = false;
                 app->my_shader.setUniform("lights[1].ambientM", glm::vec3(0.0f, 0.0f, 0.0f));
                 app->my_shader.setUniform("lights[1].diffuseM", glm::vec3(0.0f, 0.0f, 0.0f));
                 app->my_shader.setUniform("lights[1].specularM", glm::vec3(0.0f, 0.0f, 0.0f));
@@ -128,8 +128,8 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             break;
 
         case GLFW_KEY_N: // toggle day/night lighting
-            if (app->night == FALSE) { // night
-                app->night = TRUE;
+            if (!app->night) { // night
+                app->night = true;
                 app->brightness = 0.1f;
                 app->my_shader.setUniform("fog_color", glm::vec4(glm::vec3(0.0f), 1.0f));
                 app->my_shader.setUniform("lights[0].ambientM", glm::vec3(0.05f, 0.05f, 0.1f));
@@ -143,7 +143,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
                     static_cast<GLfloat>(0.5f * app->brightness)));
             }
             else { // day
-                app->night = FALSE;
+                app->night = false;
                 app->my_shader.setUniform("fog_color", glm::vec4(glm::vec3(0.85f), 1.0f));
                 app->my_shader.setUniform("lights[0].ambientM", glm::vec3(0.2f, 0.2f, 0.2f));
                 app->my_shader.setUniform("lights[0].diffuseM", glm::vec3(
@@ -290,8 +290,8 @@ void App::mouse_button_callback(GLFWwindow* window, int button, int action, int 
         }
 
         Model newProj = app->projectile;
-        newProj.origin = app->camera.Position + forward * 1.0f; // spawn slightly in front of the camera
-        newProj.velocity = forward * 10.0f;
+        newProj.origin = app->camera.Position + forward * App::kProjectileSpawnOffset; // spawn slightly in front of the camera
+        newProj.velocity = forward * App::kProjectileSpeed;
         newProj.solid = false;
 
         int id = ++g_projectile_counter;

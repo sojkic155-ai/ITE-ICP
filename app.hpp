@@ -1,7 +1,7 @@
+#pragma once
+
 // Original author: JJ
 // Modified by: Michal Sojka
-
-#pragma once
 
 #include <iostream>
 #include <opencv2/opencv.hpp>
@@ -17,6 +17,52 @@
 
 class App {
 public:
+    // Centralized project constants (static constexpr for compile-time usage).
+    // Paths
+    static constexpr const char* kMusicBirdsPath = "resources/music/birds.mp3";
+    static constexpr const char* kBackgroundMusicPath = "resources/music/Dune_Official _Soundtrack _Pauls_Dream_Hans_Zimmer.mp3";
+    static constexpr const char* kPlaneSoundPath = "resources/music/plane.mp3";
+    static constexpr const char* kOuchPath = "resources/music/ouch.mp3";
+    static constexpr const char* kGlassPath = "resources/music/wine-glass-hit.mp3";
+
+    // Audio parameters
+    static constexpr float kPlaneSoundMinDistance = 20.0f;
+    static constexpr float kMusicMinDistance = 5.0f;
+    static constexpr float kPlaneSoundVolume = 1.0f;        // irrKlang [0..1]
+    static constexpr float kBackgroundMusicVolume = 0.3f;
+    static constexpr float kMusicVolume = 0.8f;
+
+    // Rendering / gameplay
+    static constexpr float kTileSize = 1.0f / 16.0f;
+    static constexpr float kDefaultBrightness = 10.0f;
+
+    // Window & GL defaults
+    static constexpr int kDefaultWindowWidth = 640;
+    static constexpr int kDefaultWindowHeight = 480;
+    static constexpr int kGLMajor = 4;
+    static constexpr int kGLMinor = 6;
+
+    // irrKlang engine options (centralized)
+    static constexpr int kIrrKlangOptions = irrklang::ESEO_DEFAULT_OPTIONS;
+
+    // AppAssets placement/configuration
+    static constexpr int kNumPoints = 75;
+    static constexpr int kMinCoordinate = -100;
+    static constexpr int kMaxCoordinate = 100;
+    static constexpr int kMinBorder = -15;
+    static constexpr int kMaxBorder = 15;
+    static constexpr int kNumRocks = 25;
+    static constexpr int kNumRock3 = 20;
+    static constexpr int kNumRock4 = 20;
+
+    // Gameplay / projectile
+    static constexpr float kProjectileSpeed = 10.0f;
+    static constexpr float kProjectileSpawnOffset = 1.0f;
+
+    // Sound cooldowns
+    static constexpr double kOuchCooldown = 1.5;
+    static constexpr double kGlassCooldown = 1.5;
+
     // App entry point object: constructor sets up default state, real heavy init belongs in init().
     App();
 

@@ -1,121 +1,120 @@
 #pragma once
 
-#include <iostream>
-#include <opencv2/opencv.hpp>
-#include "assets.hpp"
-#include <GLFW/glfw3.h> // input handling (keys, mouse)
+// Minimal includes for a header-only camera interface.
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <GLFW/glfw3.h> // only for key constants used by ProcessInput (optional)
+
+/*
+  Lightweight Camera class:
+  - používá standardní typy (float, bool) místo GL types
+  - odstranìny zbyteèné includes (OpenCV, iostream)
+  - magic numbers pøevedeny na constexpr
+  - lepší porovnání vektorù (epsilon)
+*/
 
 class Camera {
 public:
     // Camera basis / state (updated by updateCameraVectors()).
-    glm::vec3 Position{};
-    glm::vec3 Front{};
-    glm::vec3 Right{};
-    glm::vec3 Up{}; // camera local up vector
+    glm::vec3 Position{ 0.0f };
+    glm::vec3 Front{ 0.0f, 0.0f, -1.0f };
+    glm::vec3 Right{ 1.0f, 0.0f, 0.0f };
+    glm::vec3 Up{ 0.0f, 1.0f, 0.0f };
 
-    // Euler angles (in degrees).
-    GLfloat Yaw = -90.0f;
-    GLfloat Pitch = 0.0f;
-    GLfloat Roll = 0.0f;
+    // Euler angles (degrees)
+    float Yaw = -90.0f;
+    float Pitch = 0.0f;
+    float Roll = 0.0f;
 
-    // Movement tuning.
-    GLfloat MovementSpeed = 10.0f;
-    GLfloat MouseSensitivity = 0.15f;
+    // Movement tuning
+    float MovementSpeed = 10.0f;
+    float MouseSensitivity = 0.15f;
 
-    // Simple vertical physics (jump + gravity).
+    // Vertical physics
     bool onground = false;
     float gravity = -9.81f;
     glm::vec3 Velocity{ 0.0f, 0.0f, 0.0f };
 
-    Camera(void) = default;
-
-    Camera(glm::vec3 position) : Position(position) {
-        this->Up = glm::vec3(0.0f, 1.0f, 0.0f);
-        this->updateCameraVectors();
+    Camera() = default;
+    explicit Camera(const glm::vec3& position) : Position(position) {
+        updateCameraVectors();
     }
 
-    // Build the view matrix from current position and orientation.
-    glm::mat4 GetViewMatrix()
-    {
-        return glm::lookAt(this->Position, this->Position + this->Front, this->Up);
+    // Build view matrix
+    glm::mat4 GetViewMatrix() const noexcept {
+        return glm::lookAt(Position, Position + Front, Up);
     }
 
-    // Read WASD + SPACE and integrate movement for this frame.
-    glm::vec3 ProcessInput(GLFWwindow* window, GLfloat deltaTime)
-    {
-        glm::vec3 direction{ 0 };
+    // Process keyboard state read from GLFW (keeps compatibility).
+    // Doporuèené zlepšení: oddìlit polling od logiky (pøedat struct s key states).
+    glm::vec3 ProcessInput(GLFWwindow* window, float deltaTime) noexcept {
+        constexpr float EPS = 1e-6f;
+        glm::vec3 direction{ 0.0f };
 
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) direction += Front;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) direction += -Front;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) direction += -Right;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) direction -= Front;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) direction -= Right;
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) direction += Right;
 
-        // detect modifiers
-        bool walk = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
-        bool crouch = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
+        const bool walk = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+        const bool crouch = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
 
-        // Jump only when grounded and not crouching.
-        if (onground && !crouch && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        {
-            Velocity.y = 7.0f;  // jump impulse
+        // Jump (only when grounded and not crouching)
+        if (onground && !crouch && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            Velocity.y = kJumpVelocity;
             onground = false;
         }
 
-        // Apply gravity while in the air.
+        // gravity integration
         if (!onground) {
             Velocity.y += gravity * deltaTime;
         }
 
-        // Move only in XZ plane (no flying when looking up/down).
-        if (direction != glm::vec3{ 0 }) {
+        // horizontal movement (XZ plane)
+        if (glm::length(direction) > EPS) {
             direction = glm::normalize(glm::vec3(direction.x, 0.0f, direction.z));
-
-            // compute effective speed modifier: crouch strongest, walk milder
             float speedMult = 1.0f;
-            if (crouch) speedMult = 0.25f;   // crouch -> slow
-            else if (walk) speedMult = 0.4f; // walk -> slower than run
+            if (crouch) speedMult = 0.25f;
+            else if (walk) speedMult = 0.4f;
 
             Velocity.x = direction.x * MovementSpeed * speedMult;
             Velocity.z = direction.z * MovementSpeed * speedMult;
-        }
-        else {
+        } else {
             Velocity.x = 0.0f;
             Velocity.z = 0.0f;
         }
 
-        this->Position += Velocity * deltaTime;
-        return this->Position;
+        Position += Velocity * deltaTime;
+        return Position;
     }
 
-    // Apply mouse deltas to yaw/pitch and update camera basis vectors.
-    void ProcessMouseMovement(GLfloat xoffset, GLfloat yoffset, GLboolean constraintPitch = GL_TRUE)
-    {
-        xoffset *= this->MouseSensitivity;
-        yoffset *= this->MouseSensitivity;
+    // Mouse look (x/y offsets in pixels or arbitrary units).
+    void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) noexcept {
+        xoffset *= MouseSensitivity;
+        yoffset *= MouseSensitivity;
 
-        this->Yaw += xoffset;
-        this->Pitch += yoffset;
+        Yaw += xoffset;
+        Pitch += yoffset;
 
-        if (constraintPitch)
-        {
-            if (this->Pitch > 89.0f) this->Pitch = 89.0f;
-            if (this->Pitch < -89.0f) this->Pitch = -89.0f;
+        if (constrainPitch) {
+            if (Pitch > 89.0f) Pitch = 89.0f;
+            if (Pitch < -89.0f) Pitch = -89.0f;
         }
 
-        this->updateCameraVectors();
+        updateCameraVectors();
     }
 
 private:
-    // Recompute Front/Right/Up from current yaw/pitch.
-    void updateCameraVectors()
-    {
-        glm::vec3 front;
-        front.x = cos(glm::radians(this->Yaw)) * cos(glm::radians(this->Pitch));
-        front.y = sin(glm::radians(this->Pitch));
-        front.z = sin(glm::radians(this->Yaw)) * cos(glm::radians(this->Pitch));
+    static constexpr float kJumpVelocity = 7.0f;
 
-        this->Front = glm::normalize(front);
-        this->Right = glm::normalize(glm::cross(this->Front, glm::vec3(0.0f, 1.0f, 0.0f)));
-        this->Up = glm::normalize(glm::cross(this->Right, this->Front));
+    void updateCameraVectors() noexcept {
+        glm::vec3 front;
+        front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+        front.y = sin(glm::radians(Pitch));
+        front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+
+        Front = glm::normalize(front);
+        Right = glm::normalize(glm::cross(Front, glm::vec3(0.0f, 1.0f, 0.0f)));
+        Up = glm::normalize(glm::cross(Right, Front));
     }
 };
