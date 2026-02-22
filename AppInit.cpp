@@ -9,14 +9,16 @@
 
 bool App::init()
 {
-    // Init the app runtime: GLFW window + OpenGL context + GLEW/DSA + debug output + assets + audio + camera tracker.
+    // Initialize runtime: create GLFW window + GL context, initialize GLEW/DSA,
+    // enable debug callbacks (if available), load assets and start audio/capture subsystems.
 
+    // Register a simple GLFW error callback so we get visible messages from the library.
     glfwSetErrorCallback(error_callback);
 
     if (!glfwInit())
         return false;
 
-    // Request OpenGL core profile from centralized constants.
+    // Request the OpenGL core profile and version defined in centralized constants.
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, App::kGLMajor);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, App::kGLMinor);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -24,16 +26,18 @@ bool App::init()
     window = glfwCreateWindow(App::kDefaultWindowWidth, App::kDefaultWindowHeight, "Prototype app", NULL, NULL);
     if (!window)
     {
+        // If window creation fails, make sure to cleanup GLFW.
         glfwTerminate();
         return false;
     }
 
+    // Store `this` pointer in the GLFW window so static callbacks can access App instance.
     glfwSetWindowUserPointer(window, this);
     glfwSetKeyCallback(window, key_callback);
 
     glfwMakeContextCurrent(window);
 
-    // GLEW needs this for core profiles, otherwise you often miss modern entry points.
+    // GLEW needs experimental flag for core profiles to expose modern entry points.
     glewExperimental = GL_TRUE;
     GLenum glew_ret = glewInit();
 
@@ -45,7 +49,7 @@ bool App::init()
     std::cout << "glCreateTextures ptr: " << reinterpret_cast<void*>(glCreateTextures) << "\n";
     std::cout << "glTextureStorage2D ptr: " << reinterpret_cast<void*>(glTextureStorage2D) << "\n";
 
-    // Init WGL/WGLEW-specific bits on Windows.
+    // Initialize platform-specific WGL/GLEW extensions on Windows.
     glew_ret = glewInit();
     if (glew_ret != GLEW_OK) {
         throw std::runtime_error(std::string("WGLEW failed with error: ")
@@ -55,7 +59,7 @@ bool App::init()
         std::cout << "WGLEW successfully initialized platform specific functions." << std::endl;
     }
 
-    // Make sure we actually got the profile we asked for.
+    // Verify that the created context matches the requested profile.
     GLint myint;
     glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &myint);
 
@@ -69,7 +73,7 @@ bool App::init()
         throw std::runtime_error("Unknown GL profile mask.");
     }
 
-    // Enable OpenGL debug messages if supported.
+    // Enable synchronous debug callback when supported to get runtime GL diagnostics.
     if (GLEW_ARB_debug_output) {
         glDebugMessageCallback(MessageCallback, 0);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -79,29 +83,30 @@ bool App::init()
         std::cout << "GL_DEBUG NOT SUPPORTED!" << std::endl;
     }
 
-    // This project relies on DSA calls (glCreateTextures, glNamedBufferData, ...).
+    // This project relies on Direct State Access (DSA) API; fail early if missing.
     if (!GLEW_ARB_direct_state_access)
         throw std::runtime_error("No DSA :-(");
 
-    // Print GLFW version info (runtime vs headers).
+    // Print GLFW runtime version info vs headers for quick diagnostics.
     int major, minor, revision;
     glfwGetVersion(&major, &minor, &revision);
     std::cout << "Running GLFW DLL " << major << '.' << minor << '.' << revision << std::endl;
     std::cout << "Compiled against GLFW "
         << GLFW_VERSION_MAJOR << '.' << GLFW_VERSION_MINOR << '.' << GLFW_VERSION_REVISION << std::endl;
 
+    // Load shaders, textures, models and place objects in the scene.
     init_assets();
 
-    // Enable alpha blending (needed for transparent models/textures).
+    // Configure blending for alpha-transparent objects.
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Create irrKlang engine with centralized options from App::kIrrKlangOptions.
+    // Create sound engine (irrKlang). Use centralized option flags from App constants.
     engine = irrklang::createIrrKlangDevice(irrklang::ESOD_AUTO_DETECT, App::kIrrKlangOptions);
     if (!engine)
         throw std::exception("Can not create 3D sound device");
     BackgroundEngine = engine;
 
-    // Start face tracker camera capture (index 0).
+    // Initialize face tracker (camera capture). Fail initialization if capture cannot be opened.
     if (!tracker.init(0)) return false;
 
     return true;

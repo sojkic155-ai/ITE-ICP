@@ -38,7 +38,8 @@ App::App()
       frame_count(0),
       my_texture(0)
 {
-    //------ default constructor ------
+    // Constructor: minimal runtime initialization only.
+    // Heavy initialization should happen in init() to keep the constructor lightweight.
     std::cout << "Constructed...\n";
 
 }
@@ -46,40 +47,46 @@ App::App()
 
 int App::run(void)
 {
-    // ------ Enabling the depth test and faceculling (only for the back faces) ------
+    // Main rendering loop entry point.
+    // Set OpenGL global state that is required for 3D rendering.
+    // Enable depth testing so fragments are drawn with correct occlusion.
     glEnable(GL_DEPTH_TEST);
     
-    glCullFace(GL_BACK);  // The default
-    glEnable(GL_CULL_FACE); // assume ALL objects are non-transparent 
+    glCullFace(GL_BACK);  // The default culling face
+    glEnable(GL_CULL_FACE); // assume most geometry is opaque and can be back-face culled
     
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);    // Disable cursor, so that it can not leave window, and we can process movement
-    glfwGetCursorPos(window, &cursorLastX, &cursorLastY);           // get first position of mouse cursor
+    // Hide the cursor and capture it inside the window for FPS-style camera control.
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwGetCursorPos(window, &cursorLastX, &cursorLastY);           // record initial mouse position
 
     update_projection_matrix();
-    glViewport(0, 0, width, height);    //Set viewport
+    glViewport(0, 0, width, height);    // Set the GL viewport to the window size
 
-    camera.Position = glm::vec3(0.0, 10.0, 0.0);    // Setting the camera starting position
+    // Place the camera at the starting world position.
+    camera.Position = glm::vec3(0.0, 10.0, 0.0);
 
-    glm::vec4 my_rgba = glm::vec4(r,g,b,a); // Creatiing the vector for the color input of the object
+    // Default color used for object tinting; alpha is adjusted for transparent pass later.
+    glm::vec4 my_rgba = glm::vec4(r,g,b,a); // Creating the vector for the color input of the object
     a = 0.1f;
     glm::vec4 transparent_rgba = glm::vec4(r, g, b, a);
     float tile_size = App::kTileSize;            // Size of one tile on the texture atlas
-    glm::vec2 tile_offset = glm::vec2(0.0f * tile_size, 0.0f * tile_size);   // Setting the position of the desired tile of the texture atlas
+    glm::vec2 tile_offset = glm::vec2(0.0f * tile_size, 0.0f * tile_size);   // Position of selected tile in atlas
 
-    // Setting variables for the FPS calculations
+    // Initialize timing for FPS calculation.
     double last_frame_time = glfwGetTime();
     last_time = Clock::now();
     frame_count = 0;
 
-    my_shader.activate();   // Because we only have one shader
+    // Activate shader program once; uniforms will be updated per-frame / per-object.
+    my_shader.activate();
 
-    // ----- Setting the parameters of the desired lights. (All parameters needs to be set from the s_lights struct for it to work >.<)------
-    // Currently these parameters generrate a green and a blue pointlight at the top and bottom of the loaded in textured cube
+    // Configure lighting uniforms. The shader expects an array of light structs.
     const int maxlights = 4;
-    my_shader.setUniform("N_matrix", Ground.normal_matrix); //Needed for light calculations
+    my_shader.setUniform("N_matrix", Ground.normal_matrix); // Needed for per-object normal transform
 
     brightness = static_cast<int>(App::kDefaultBrightness);
 
+    // Compute a fallback lamp top position using terrain height; override if Lamp model present.
     float terrainY = getTerrainHeight(13.5f, 17.5f, Ground.heightmap);
 
     glm::vec3 lampTopWorldPos(13.5f, terrainY + 19.0f, 20.5f); // fallback
@@ -93,10 +100,12 @@ int App::run(void)
         if (maxY != -std::numeric_limits<float>::infinity()) {
             lampTopWorldPos.x = lampModel.origin.x;
             lampTopWorldPos.z = lampModel.origin.z;
+            // place the light slightly below the top vertex to match model geometry
             lampTopWorldPos.y = lampModel.origin.y + maxY * lampModel.scale.y - 0.15f;
         }
     }
 
+    // Set light parameters. Each block configures a different light slot.
     for (int i = 0; i < maxlights; ++i) {
         if (i == 0) {
             my_shader.setUniform("lights[0].position", glm::vec4(0.0f, 100.0f, 0.0f, 0.0f));
@@ -111,6 +120,7 @@ int App::run(void)
             my_shader.setUniform("lights[0].exponent", 0);
         }
         else if (i == 1) {
+            // Light bound to the camera (e.g. flashlight)
             my_shader.setUniform("lights[1].position", glm::vec4(camera.Position, 1.0f));
             my_shader.setUniform("lights[1].ambientM", glm::vec3(0.0f, 0.0f, 0.0f));
             my_shader.setUniform("lights[1].diffuseM", glm::vec3(0.0f, 0.0f, 0.0f));
@@ -123,6 +133,7 @@ int App::run(void)
             my_shader.setUniform("lights[1].exponent", 20.0f);
         }
         else if (i == 2) {
+            // Lamp light (placed at lampTopWorldPos)
             my_shader.setUniform("lights[2].position", glm::vec4(lampTopWorldPos, 1.0f));
             my_shader.setUniform("lights[2].ambientM", glm::vec3(0.15f, 0.08f, 0.03f));
             my_shader.setUniform("lights[2].diffuseM", glm::vec3(1.0f * brightness, 0.4f * brightness, 0.0f * brightness));
@@ -135,6 +146,7 @@ int App::run(void)
             my_shader.setUniform("lights[2].exponent", 20.0f);
         }
         else if (i == 3) {
+            // Decorative point light that will be animated (blinked) later
             my_shader.setUniform("lights[3].position", glm::vec4(5.0f, 0.5f, 5.0f, 1.0f));
             my_shader.setUniform("lights[3].ambientM", glm::vec3(0.08f, 0.18f, 0.06f));
             my_shader.setUniform("lights[3].diffuseM", glm::vec3(0.3f * brightness, 0.95f * brightness, 0.3f * brightness));
@@ -159,29 +171,30 @@ int App::run(void)
             my_shader.setUniform("lights[4].exponent", 40.0f);
         }
     }
-    // --- Set general parameters for all lights ---
+    // Global light multipliers and specular shininess.
     my_shader.setUniform("ambient_intensity", glm::vec3(1.0f, 1.0f, 1.0f));
     my_shader.setUniform("diffuse_intensity", glm::vec3(1.0f, 1.0f, 1.0f));
     my_shader.setUniform("specular_intensity", glm::vec3(1.0f, 1.0f, 1.0f));
     my_shader.setUniform("specular_shinines", 80.0f);
-    //------ ------
 
-    std::vector<Model*> transparent;    // temporary, vector of pointers to transparent objects
-    transparent.reserve(scene.size());  // reserve size for all objects to avoid reallocation
+    // Temporary container to collect pointers to transparent models for painter's algorithm.
+    std::vector<Model*> transparent;
+    transparent.reserve(scene.size());  // avoid reallocation during each frame
     
-    //----- 2D & 3D audio -----    
-    // position, playLooped = true, startPaused = true, track = true
+    // Audio handles: ambient 3D sounds and background stereo music.
     irrklang::ISound* music = nullptr;
     irrklang::ISound* BackgroundMusic = nullptr;
     irrklang::ISound* planeSound = nullptr;
 
     if (engine) {
+        // Start a 3D bird sound, looped and tracked.
         music = engine->play3D(App::kMusicBirdsPath, irrklang::vec3df(0, 0, 0), false, true, true);
         if (music) {
             music->setMinDistance(App::kMusicMinDistance);
             music->setVolume(App::kMusicVolume);
             music->setIsPaused(false);
         }
+        // Plane engine sound, looped.
         planeSound = engine->play3D(App::kPlaneSoundPath, irrklang::vec3df(0.0f, 0.0f, 0.0f), true, true, true);
         if (planeSound) {
             planeSound->setMinDistance(App::kPlaneSoundMinDistance);
@@ -190,6 +203,7 @@ int App::run(void)
         }
     }
     if (BackgroundEngine) {
+        // Background 2D music (stereo), optional.
         BackgroundMusic = BackgroundEngine->play2D(App::kBackgroundMusicPath, true, true, false);
         if (BackgroundMusic) {
             // track==false above, so return may be nullptr; if non-null adjust volume and unpause
@@ -201,9 +215,8 @@ int App::run(void)
     double last_ouch_time = -10.0;
     double last_glass_time = -10.0;
 
-    // Start background worker (restore original behavior)
+    // Start face-tracking background worker; if it fails, ensure audio resources are cleaned up.
     if (!tracker.startWorker()) {
-        // cleanup any created sounds before returning error
         if (music) { music->stop(); music->drop(); music = nullptr; }
         if (BackgroundMusic) { BackgroundMusic->stop(); BackgroundMusic->drop(); BackgroundMusic = nullptr; }
         if (planeSound) { planeSound->stop(); planeSound->drop(); planeSound = nullptr; }
@@ -211,10 +224,9 @@ int App::run(void)
     }
     std::uint64_t last_seq = 0;
 
-    while (!glfwWindowShouldClose(window)) {    //Main loop of the application
+    while (!glfwWindowShouldClose(window)) {    // Main loop of the application
         
-        // Set callbacks only once in init; calling them every frame is unnecessary.
-        // Keep existing calls for backward compatibility but guard to avoid overhead.
+        // Ensure callbacks are registered once. Re-registering each frame is unnecessary.
         static bool callbacks_set = false;
         if (!callbacks_set) {
             glfwSetCursorPosCallback(window, cursor_position_callback);
@@ -222,19 +234,22 @@ int App::run(void)
             glfwSetWindowSizeCallback(window,framebuffer_size_callback);
             callbacks_set = true;
         }
-        glfwSetWindowTitle(window, std::string("FPS: ").append(std::to_string(fps)).append(" Vsync: ").append(std::to_string(vsync_on)).c_str());   //Set the window title to show current FPS of the application and if Vsync is active or not
+        // Show FPS and vsync status in the window title.
+        glfwSetWindowTitle(window, std::string("FPS: ").append(std::to_string(fps)).append(" Vsync: ").append(std::to_string(vsync_on)).c_str());
 
+        // Clear color depends on day/night toggle.
         if (night) {
             glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
         }
         else { glClearColor(0.53f, 0.81f, 0.92f, 1.0f); }  // sky blue RGBA
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear canvas
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear frame buffer and depth buffer
 
-        double current_frame_time = glfwGetTime(); //Needed for FPS calculation
-
+        // Time since last frame (seconds)
+        double current_frame_time = glfwGetTime();
         double delta_t = current_frame_time - last_frame_time; 
         last_frame_time = current_frame_time;
 
+        // Save previous camera position for collision rollback.
         glm::vec3 prevCameraPos = camera.Position;
 
         // Update crouch / walk state from keys (CTRL = crouch, SHIFT = walk)
@@ -243,7 +258,7 @@ int App::run(void)
         this->crouch_pressed = crouchPressed;
         this->walk_pressed = walkPressed;
 
-        // Smoothly interpolate eye height toward target to avoid instant pop when standing up/down.
+        // Smoothly interpolate eye height toward its target to avoid abrupt jumps when changing stance.
         float targetEye = crouchPressed ? this->eyeHeightCrouch : this->eyeHeightStanding;
         const float eyeInterpSpeed = 6.0f; // larger = faster transition
         float t = std::min(1.0f, eyeInterpSpeed * static_cast<float>(delta_t));
@@ -251,20 +266,19 @@ int App::run(void)
 
         camera.ProcessInput(window, static_cast<float>(delta_t));
 
-        // --- Process ground colision ---
+        // --- Ground collision handling (terrain height) ---
         float terrainY = getTerrainHeight(camera.Position.x, camera.Position.z, Ground.heightmap);
         float desiredMinEyeY = terrainY + this->eyeHeight;
 
-        // If on ground and below desired minimal eye Y (e.g. just released crouch), move up smoothly toward desiredMinEyeY.
+        // If the camera is marked on-ground but slightly below desired eye height (e.g. released crouch),
+        // gently raise the camera to avoid snapping.
         if (camera.onground && camera.Position.y < desiredMinEyeY) {
-            // use same interpolation factor t for a smooth gentle rise
             camera.Position.y += (desiredMinEyeY - camera.Position.y) * t;
             camera.Velocity.y = 0.0f;
-            // keep marked as grounded while adjusting
             camera.onground = true;
         }
         else {
-            // preserve previous grounded/air state based on comparison with desiredMinEyeY
+            // Maintain grounded state if within epsilon of desired height.
             if (camera.Position.y <= desiredMinEyeY + 0.001f) {
                 camera.onground = true;
             }
@@ -273,7 +287,7 @@ int App::run(void)
             }
         }
 
-        // ---  (sphere-AABB) ---
+        // --- Simple sphere-vs-AABB collision detection for the camera ---
         const float cameraRadius = 0.75f;
         bool collision = false;
         std::string collidedName;
@@ -290,26 +304,25 @@ int App::run(void)
         }
 
         if (collision) {
-            // camera rollback
+            // rollback camera to avoid penetrating solid geometry
             camera.Position = prevCameraPos;
             camera.Velocity = glm::vec3(0.0f);
 
             if (!collidedName.empty()) {
                 double now = glfwGetTime();
 
-                // collision with cactus -> ouch
+                // Collision with cactus: play "ouch" sound with cooldown.
                 if (collidedName.rfind("Cactus:", 0) == 0) {
-                    const double ouchCooldown = 1.5; // s
+                    const double ouchCooldown = 1.5; // seconds
                     if (!mute && (now - last_ouch_time) > ouchCooldown && engine) {
-                        // play3D returns ISound* only when track==true or startPaused==true
-                        // We don't need to track the sound here, so use play3D without tracking.
+                        // Quick one-shot sound; no need to keep ISound* reference here.
                         engine->play3D(App::kOuchPath, irrklang::vec3df(collidedPos.x, collidedPos.y, collidedPos.z), false, false, false);
                         last_ouch_time = now;
                     }
                 }
-                // collision with transparent model -> glass hit
+                // Collision with transparent block: play glass hit with cooldown.
                 else if (collidedName == "trasparent_block") {
-                    const double glassCooldown = 1.5; // s
+                    const double glassCooldown = 1.5; // seconds
                     if (!mute && (now - last_glass_time) > glassCooldown && engine) {
                         engine->play3D(App::kGlassPath, irrklang::vec3df(collidedPos.x, collidedPos.y, collidedPos.z), false, false, false);
                         last_glass_time = now;
@@ -318,20 +331,22 @@ int App::run(void)
             }
         }
 
-        my_shader.setUniform("uV_m", camera.GetViewMatrix());   // Update the view matrix based on the viewmatrix of the camera
+        // Update shader view/projection matrices for this frame.
+        my_shader.setUniform("uV_m", camera.GetViewMatrix());   // view matrix from camera
         my_shader.setUniform("uP_m", projection_matrix);        
-      
-        // --- Set the color and texture tile (from texture atlas) of the object ---     
+
+        // Set the color and texture tile (from texture atlas) of the object for this pass.
         tile_offset = glm::vec2(14.0f * tile_size, 4.0f * tile_size);
         my_shader.setUniform("my_color", my_rgba);
         my_shader.setUniform("tileSize", tile_size);
         my_shader.setUniform("tileOffset", tile_offset);  
 
 
+        // Update camera-bound light position and direction.
         my_shader.setUniform("lights[1].position", glm::vec4(camera.Position, 1.0f));
         my_shader.setUniform("lights[1].direction", glm::vec3(camera.Front.x * delta_t, camera.Front.y * delta_t, camera.Front.z * delta_t));
 
-        // --- make lights[3] red and blinking ---
+        // --- Make lights[3] red and blinking: simple time-based blinking sequence. ---
         {
             const double blinkOn = 0.12;   
             const double blinkGap = 0.12;
@@ -365,21 +380,22 @@ int App::run(void)
             my_shader.setUniform("lights[3].specularM", redSpecular);
         }
         
-        // --- set the 3D audio ---
-        // move sound source
+        // --- 3D audio listener/source updates ---
         if (music) {
+            // keep the 3D bird sound at a fixed point in world space for a natural ambient effect
             irrklang::vec3df newPosition(20.0, 10.0, 20.0);
             music->setPosition(newPosition);
         }
-        // move Listener (similar to Camera)
         if (engine) {
-            irrklang::vec3df position(camera.Position.x, camera.Position.y, camera.Position.z); // position of the listener
-            irrklang::vec3df lookDirection(camera.Front.x, camera.Front.y, camera.Front.z); // the direction the listener looks into
-            irrklang::vec3df velPerSecond(0, 0, 0); // only relevant for doppler effects
-            irrklang::vec3df upVector(camera.Up.x, camera.Up.y, camera.Up.z); // where 'up' is in your 3D scene
+            // Update the listener to follow the camera for spatial audio.
+            irrklang::vec3df position(camera.Position.x, camera.Position.y, camera.Position.z);
+            irrklang::vec3df lookDirection(camera.Front.x, camera.Front.y, camera.Front.z);
+            irrklang::vec3df velPerSecond(0, 0, 0); // doppler velocity (unused)
+            irrklang::vec3df upVector(camera.Up.x, camera.Up.y, camera.Up.z);
             engine->setListenerPosition(position, lookDirection, velPerSecond, upVector);
         }
 
+        // Pause/unpause sounds based on mute flag.
         if (mute) {
             if (music) music->setIsPaused(true);
             if (BackgroundMusic) BackgroundMusic->setIsPaused(true);
@@ -391,18 +407,19 @@ int App::run(void)
             if (planeSound) planeSound->setIsPaused(false);
         }
     
+        // If a tracked sound finished, release its reference.
         if (music && music->isFinished()){
             music->drop();
             music = nullptr;
         }
                         
-        // Terrain draw uses opposite winding.
+        // Draw terrain first; it uses opposite winding to other objects.
         glFrontFace(GL_CW);
         Ground.draw(translate, rotate, scale);
         glFrontFace(GL_CCW);
 
 
-        // Optional face-control: uses detected face size to move camera forward/backward.
+        // Optional face-control: use face detector to adjust camera forward/backward.
         if (face_control_enabled && tracker.workerRunning()) {
             if (auto res = tracker.getLatest(last_seq)) {
                 if (res->face_found) {
@@ -415,6 +432,7 @@ int App::run(void)
                     FaceTracResult = alpha * targetPos + (1.0f - alpha) * FaceTracResult;
 
                     if (face_control_enabled) {
+                        // Move camera depending on face size error with a deadzone.
                         float error = res->face_size_px - face_control_target_px;
                         if (std::abs(error) > face_control_deadzone_px) {
                             float dirSign = (error > 0.0f) ? 1.0f : -1.0f;
@@ -426,7 +444,7 @@ int App::run(void)
             }
         }
         
-        // Draw non-transparent models first; collect transparent ones for later sorting.
+        // Draw non-transparent models first; collect transparent ones for a separate pass.
         transparent.clear();
 
         for (auto& [name, model] : scene) {
@@ -440,9 +458,11 @@ int App::run(void)
                     tile_offset = glm::vec2(0.0f * tile_size, 3.0f * tile_size);
                     my_shader.setUniform("tileOffset", tile_offset);
                     float height = getTerrainHeight(model.origin.x, model.origin.z, Ground.heightmap);
+                    // Animate a model along a circular path.
                     model.circlepath(static_cast<float>(delta_t), height, 90.0f, 0.2f);
                     my_shader.setUniform("lights[3].position", glm::vec4(model.origin, 1.0f));
                     if (planeSound) {
+                        // Update plane sound to match the moving model's position and velocity.
                         planeSound->setPosition(irrklang::vec3df(model.origin.x, model.origin.y, model.origin.z));
                         planeSound->setVelocity(irrklang::vec3df(model.velocity.x, model.velocity.y, model.velocity.z));
                     }
@@ -459,7 +479,7 @@ int App::run(void)
                     model.draw(translate, rotate, scale);
                 }
                 else if (name.rfind("throwable_rock", 0) == 0) {
-                    // Projectiles get simple physics until they "land" on terrain.
+                    // Projectiles: simple sub-stepped physics until they land on terrain.
                     const float velocityEps = 1e-4f;
                     bool inAir = glm::length(model.velocity) > velocityEps;
 
@@ -468,19 +488,20 @@ int App::run(void)
                         const float maxStep = 0.02f; // 20 ms per physics substep
                         bool landed = false;
 
+                        // Sub-step loop to avoid tunnelling and keep stable physics.
                         while (remaining > 0.0f && !landed) {
                             float step = std::min(remaining, maxStep);
                             model.flyghtpath(step, FaceTracResult);
                             remaining -= step;
 
-                            // check collision with terrain at current XY
+                            // Check collision with terrain at current XY and stop when hitting ground.
                             float groundY = getTerrainHeight(model.origin.x, model.origin.z, Ground.heightmap);
                             const float groundEps = 0.01f;
                             if (model.origin.y <= groundY + groundEps) {
                                 model.origin.y = groundY + groundEps;
                                 model.velocity = glm::vec3(0.0f);
                                 landed = true;
-                                model.solid = true;
+                                model.solid = true; // become solid after landing
                                 model.computeAABB();
                             }
                         }
@@ -499,11 +520,11 @@ int App::run(void)
                 
             }
             else
-                transparent.emplace_back(&model); // save pointer for painters algorithm
+                transparent.emplace_back(&model); // Save pointer for painter's algorithm pass.
         }
 
         if (!leftclick) {
-            //scene.erase("throwable_rock");
+            // scene.erase("throwable_rock"); // intentionally disabled: keep rock for debug
         }
 
         auto itRock = scene.find("throwable_rock");
@@ -517,24 +538,25 @@ int App::run(void)
         my_shader.setUniform("tileOffset", tile_offset);
         my_shader.setUniform("my_color", transparent_rgba);
 
-        // SECOND PART - draw only transparent - painter's algorithm (sort by distance from camera, from far to near)
+        // SECOND PART - draw only transparent objects.
+        // Sort by distance from camera (far -> near) and render with blending enabled.
         std::sort(transparent.begin(), transparent.end(), [&](Model const* a, Model const* b) {
-            glm::vec3 translation_a = glm::vec3(a->model_matrix[3]);  // get 3 values from last column of model matrix = translation
-            glm::vec3 translation_b = glm::vec3(b->model_matrix[3]);  // dtto for model B
+            glm::vec3 translation_a = glm::vec3(a->model_matrix[3]);  // extract translation from model matrix
+            glm::vec3 translation_b = glm::vec3(b->model_matrix[3]);  // same for b
             return glm::distance(camera.Position, translation_a) < glm::distance(camera.Position, translation_b); // sort by distance from camera
             });
 
-        // set GL for transparent objects // TODO: from lectures
+        // Configure GL for transparency: enable blending, preserve depth buffer for reads but disable writes.
         glEnable(GL_BLEND);
         glDepthMask(GL_FALSE); 
         glDisable(GL_CULL_FACE);
-        // draw sorted transparent
+        // Draw sorted transparent geometry
         for (auto p : transparent) {
             my_shader.setUniform("N_matrix", p->normal_matrix);
             my_shader.setUniform("uM_m", p->model_matrix);
             p->draw();
         }
-        // restore GL properties for non-transparent objects // TODO: from lectures
+        // Restore GL state for opaque geometry rendering.
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
         glEnable(GL_CULL_FACE);
@@ -544,10 +566,10 @@ int App::run(void)
         glfwPollEvents();
     }
 
-    // Shutdown worker and window resources.
+    // Shutdown background worker if running.
     if (tracker.workerRunning()) tracker.stopWorker();
 
-    // Drop any remaining sounds we created/tracked here to avoid leaks.
+    // Release audio resources created in this scope to avoid leaks.
     if (music) {
         if (!music->isFinished()) music->stop();
         music->drop();
@@ -574,7 +596,7 @@ int App::run(void)
 
 App::~App()
 {
-    // Cleanup: windowing, GL objects, and audio.
+    // Destructor: cleanup of external libraries and GL resources.
     cv::destroyAllWindows();
     glfwTerminate();
     my_shader.clear();
@@ -593,6 +615,7 @@ App app;
 
 int main()
 {
+    // Minimal main: initialize app and run. Return non-zero on init failure.
     if (!app.init()) {
         std::cerr << "App initialization failed.\n";
         return 3; 

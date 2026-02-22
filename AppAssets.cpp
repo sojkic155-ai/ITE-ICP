@@ -12,7 +12,7 @@
 #include <stdexcept>
 
 void App::init_assets(void) {
-    // Load everything needed for rendering (shader, textures, terrain, models) and register objects into `scene`.
+    // Load scene assets: shaders, textures, terrain and models, then register instances into `scene`.
 
     // Shader used by the whole scene.
     my_shader = ShaderProgram("lighting_shader.vert", "lighting_shader.frag");
@@ -26,7 +26,7 @@ void App::init_assets(void) {
     GLuint stone_3 = textureInit("resources/textures/rock_2.jpg");
     GLuint Cactus = textureInit("resources/textures/cactustextur.png");
 
-    // Take one tile from a texture atlas and upload it as a standalone GL texture.
+    // Helper: extract one square tile from a packed atlas and upload it as a standalone GL texture.
     auto createSubTextureFromAtlas = [&](const std::filesystem::path& atlasPath, int tileX, int tileY, int tilesPerRow = 16) -> GLuint {
         cv::Mat atlas = cv::imread(atlasPath.string(), cv::IMREAD_UNCHANGED);
         if (atlas.empty()) {
@@ -37,7 +37,7 @@ void App::init_assets(void) {
         int sx = tileX * tilePx;
         int sy = tileY * tilePx;
 
-        // Keep the selected tile inside the atlas bounds.
+        // Clamp selection so the ROI stays inside atlas bounds.
         sx = std::max(0, std::min(sx, atlas.cols - tilePx));
         sy = std::max(0, std::min(sy, atlas.rows - tilePx));
 
@@ -46,11 +46,12 @@ void App::init_assets(void) {
         return gen_tex(tile);
         };
 
+    // Create small textures used for some objects by sampling the atlas.
     GLuint ground_tex = createSubTextureFromAtlas("resources/textures/tex_2048.png", 14, 7);
     GLuint cactus_tex = createSubTextureFromAtlas("resources/textures/tex_2048.png", 14, 1);
     GLuint plane_tex = createSubTextureFromAtlas("resources/textures/tex_2048.png", 1, 0);
 
-    // Terrain mesh + cached heightmap data for collision / placement.
+    // Build terrain mesh and cache heightmap for collision / placement queries.
     Ground = Heightmap("resources/heightmaps/ground_v1.png", my_shader, ground_tex);
 
     // Random placement config for environment objects.
@@ -66,7 +67,7 @@ void App::init_assets(void) {
     float positionx = 0.0f;
     float positionz = 0.0f;
 
-    // Load templates (some are copied and then placed multiple times).
+    // Load templates (these are copied and transformed for placement).
     Model my_model = Model("resources/objects/Wooden_Crate.obj", my_shader, my_texture);
     Model base = my_model;
     Model transparent_model = my_model;
@@ -79,14 +80,14 @@ void App::init_assets(void) {
     Model rock3Template = Model("resources/objects/rock_3.obj", my_shader, stone_2);
     Model rock4Template = Model("resources/objects/rock_4.obj", my_shader, stone_3);
 
-    // Place the main crate.
+    // Place the main crate at a fixed location above terrain.
     positionx = -5.0f;
     positionz = 15.0f;
     float terrainYm = getTerrainHeight(positionx, positionz, Ground.heightmap);
     my_model.origin = glm::vec3(positionx, terrainYm + 0.10f, positionz);
     my_model.scale = glm::vec3(0.5f);
 
-    // Spawn cactuses randomly, but keep a clear area around the center.
+    // Spawn cactuses randomly; keep central area clear by retrying points inside the forbidden box.
     for (int i = 0; i < numPoints; ++i) {
         float x, z;
         do {
@@ -99,6 +100,7 @@ void App::init_assets(void) {
 
         float s1 = 1.55f + static_cast<float>(std::rand()) / RAND_MAX * 1.65f;
         Cactuses.scale = glm::vec3(s1);
+        // Rotate each cactus randomly around the vertical axis and align model to world.
         Cactuses.orientation = glm::vec3(glm::radians(-90.0f), 0.0f, glm::radians(static_cast<float>(std::rand() % 360)));
 
         Cactuses.solid = true;
@@ -107,7 +109,7 @@ void App::init_assets(void) {
     }
 
     {
-        // Spawn rock_2 instances.
+        // Spawn multiple instances of rockTemplate.
         const int numRocks = App::kNumRocks;
         for (int i = 0; i < numRocks; ++i) {
             float x, z;
@@ -119,6 +121,7 @@ void App::init_assets(void) {
             float terrainYat = getTerrainHeight(x, z, Ground.heightmap);
             rockTemplate.origin = glm::vec3(x, terrainYat, z);
 
+            // Small random scale to vary sizes.
             float s = 0.002f + static_cast<float>(std::rand()) / RAND_MAX * 0.04f;
             rockTemplate.scale = glm::vec3(s);
             rockTemplate.orientation = glm::vec3(0.0f, glm::radians(static_cast<float>(std::rand() % 360)), 0.0f);
@@ -130,7 +133,7 @@ void App::init_assets(void) {
     }
 
     {
-        // Spawn rock_3 and rock_4 instances.
+        // Spawn rock3 and rock4 variations with different placement offsets and random orientation.
         const int numRock3 = App::kNumRock3;
         for (int i = 0; i < numRock3; ++i) {
             float x, z;
@@ -140,6 +143,7 @@ void App::init_assets(void) {
             } while (x > minborder && x < maxborder && z > minborder && z < maxborder);
 
             float terrainYat = getTerrainHeight(x, z, Ground.heightmap);
+            // Place slightly below terrain origin to embed the rock visually.
             rock3Template.origin = glm::vec3(x, terrainYat - 0.5f, z);
 
             float s3 = 0.01f + static_cast<float>(std::rand()) / RAND_MAX * 0.09f;
@@ -176,14 +180,14 @@ void App::init_assets(void) {
         }
     }
 
-    // Place lamp.
+    // Place main lamp with scale applied.
     positionx = 2.0f;
     positionz = 10.0f;
     terrainYm = getTerrainHeight(positionx, positionz, Ground.heightmap);
     Lamp.origin = glm::vec3(positionx, terrainYm, positionz);
     Lamp.scale = glm::vec3(3.0f);
 
-    // Place crate base + transparent crate.
+    // Place crate base and a transparent crate on top of terrain.
     base.origin = glm::vec3(-5.0f, getTerrainHeight(-5.0f, 5.0f, Ground.heightmap) + 0.5f, 10.0f);
     base.scale = glm::vec3(0.25f);
 
@@ -196,7 +200,7 @@ void App::init_assets(void) {
     transparent_model.origin.z = positionz;
     transparent_model.transparent = true;
 
-    // Compute the model's min/max local Y so we can place it exactly on the terrain.
+    // Compute the model's minimum and maximum local Y so we can place it exactly on the terrain surface.
     auto computeMinMaxY = [](Model const& m) -> std::pair<float, float> {
         if (m.vertices.empty()) return { 0.0f, 0.0f };
         float miny = std::numeric_limits<float>::infinity();
@@ -210,9 +214,11 @@ void App::init_assets(void) {
 
     auto [t_minY, t_maxY] = computeMinMaxY(transparent_model);
     if (t_minY == std::numeric_limits<float>::infinity()) {
+        // No vertex data available; place block slightly above ground.
         transparent_model.origin.y = groundY + 0.01f;
     }
     else {
+        // Shift origin so the model's minimum Y sits on the terrain.
         transparent_model.origin.y = groundY - t_minY * transparent_model.scale.y;
     }
 
@@ -221,6 +227,7 @@ void App::init_assets(void) {
 
     glm::vec3 centroid_local(0.0f);
     if (!transparent_model.vertices.empty()) {
+        // Compute approximate centroid in local coordinates to position the mini-lamp correctly.
         for (auto const& v : transparent_model.vertices) {
             centroid_local += v.position;
         }
@@ -234,7 +241,7 @@ void App::init_assets(void) {
         mini_lamp.origin = transparent_model.origin;
     }
 
-    // Place the plane.
+    // Place the moving plane used as an animated model in the scene.
     positionx = 5.0f;
     positionz = 5.0f;
     terrainYm = getTerrainHeight(positionx, positionz, Ground.heightmap);
@@ -242,17 +249,17 @@ void App::init_assets(void) {
     plane.scale = glm::vec3(0.5f);
     plane.orientation.z = glm::radians(30.0f);
 
-    // Init projectile placement.
+    // Init projectile template (spawned when player shoots).
     projectile.origin = glm::vec3(0.0f, 0.5f, 0.0f);
     projectile.scale = glm::vec3(0.01f);
 
-    // Enable collisions for selected objects.
+    // Enable collisions for selected objects and compute their AABB for quick intersection tests.
     transparent_model.solid = true; transparent_model.computeAABB();
     Lamp.solid = true;              Lamp.computeAABB();
     mini_lamp.solid = true;         mini_lamp.computeAABB();
     my_model.solid = true;          my_model.computeAABB();
 
-    // Register everything into the scene map.
+    // Register everything into the scene map so the main loop can draw and update them.
     scene.insert({ "my_first_object", my_model });
     scene.insert({ "trasparent_block", transparent_model });
     scene.insert({ "Lamp", Lamp });
@@ -260,13 +267,12 @@ void App::init_assets(void) {
     scene.insert({ "wooden_base", base });
     scene.insert({ "minilamp", mini_lamp });
 
-    // Drop CPU-side mesh data for this local copy (scene has its own stored copy anyway).
+    // Drop CPU-side mesh data for this local copy (scene stores its own copy).
     my_model.meshes.clear();
 }
 
 GLuint App::textureInit(const std::filesystem::path& file_name) {
     // Load an image via OpenCV and upload it as an OpenGL texture.
-
     cv::Mat image = cv::imread(file_name.string(), cv::IMREAD_UNCHANGED);
     if (image.empty()) {
         throw std::runtime_error("No texture in file: " + file_name.string());
@@ -277,7 +283,6 @@ GLuint App::textureInit(const std::filesystem::path& file_name) {
 
 GLuint App::gen_tex(cv::Mat& image) {
     // Create a 2D GL texture from an OpenCV Mat (expects 3 or 4 channels, BGR/BGRA).
-
     if (image.empty()) {
         throw std::runtime_error("Image empty?\n");
     }
@@ -286,12 +291,15 @@ GLuint App::gen_tex(cv::Mat& image) {
     glCreateTextures(GL_TEXTURE_2D, 1, &ID);
     glObjectLabel(GL_TEXTURE, ID, -1, "Mytexture");
 
+    // Handle common channel layouts produced by OpenCV.
     switch (image.channels()) {
     case 3:
+        // BGR image -> upload as RGB8 with BGR pixel format.
         glTextureStorage2D(ID, 1, GL_RGB8, image.cols, image.rows);
         glTextureSubImage2D(ID, 0, 0, 0, image.cols, image.rows, GL_BGR, GL_UNSIGNED_BYTE, image.data);
         break;
     case 4:
+        // BGRA image -> upload as RGBA8 with BGRA pixel format.
         glTextureStorage2D(ID, 1, GL_RGBA8, image.cols, image.rows);
         glTextureSubImage2D(ID, 0, 0, 0, image.cols, image.rows, GL_BGRA, GL_UNSIGNED_BYTE, image.data);
         break;
@@ -299,7 +307,7 @@ GLuint App::gen_tex(cv::Mat& image) {
         throw std::runtime_error("unsupported channel cnt. in texture:" + std::to_string(image.channels()));
     }
 
-    // Filtering + mipmaps (nice quality when zoomed out).
+    // Filtering + mipmaps for better minified quality.
     glTextureParameteri(ID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(ID, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glGenerateTextureMipmap(ID);

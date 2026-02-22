@@ -4,16 +4,17 @@
 #include <string>
 #include <GLFW/glfw3.h>
 
-// Counter used to generate unique keys for spawned projectiles.
+// Global counter to produce unique keys for spawned projectiles.
 std::atomic<int> g_projectile_counter{ 0 };
 
 void App::error_callback(int error, const char* description) {
-    // GLFW error callback.
+    // GLFW error callback: log the error description to stderr.
     std::cerr << "Error: " << description << std::endl;
 }
 
 void App::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    // Main keyboard input handler (toggles + quick actions).
+    // Keyboard handler: handles toggles and quick actions.
+    // Note: only respond to key press and repeat events here.
     auto app = static_cast<App*>(glfwGetWindowUserPointer(window));
 
     if ((action == GLFW_PRESS) || (action == GLFW_REPEAT))
@@ -31,6 +32,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             break;
 
         case GLFW_KEY_TAB: // toggle fullscreen/windowed
+            // Toggle between fullscreen and windowed modes, restoring previous placement when leaving fullscreen.
             if (!app->fullscreen) {
                 app->switch_to_fullscreen();
                 app->fullscreen = true;
@@ -54,6 +56,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
                 glViewport(0, 0, app->width, app->height);
                 app->update_projection_matrix();
 
+                // restore cursor state and recenter to avoid large mouse deltas
                 glfwSetInputMode(window, GLFW_CURSOR, app->cursor_state ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
 
                 double cx = static_cast<double>(ww) / 2.0;
@@ -71,17 +74,18 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
 
         case GLFW_KEY_C: // toggle cursor lock
         {
+            // Toggle captured cursor for mouse-look vs UI interaction.
             app->cursor_state = !app->cursor_state;
 
             double cx = 0.0, cy = 0.0;
 
             if (app->cursor_state) {
-                // enable cursor
+                // enable cursor (free movement)
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                 glfwGetCursorPos(window, &cx, &cy);
             }
             else {
-                // disable cursor
+                // disable cursor (center it for FPS-style look)
                 int w = 0, h = 0;
                 glfwGetWindowSize(window, &w, &h);
                 if (w <= 0 || h <= 0) {
@@ -105,7 +109,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             app->mute = !app->mute;
             break;
 
-        case GLFW_KEY_F: // toggle flashlight
+        case GLFW_KEY_F: // toggle flashlight (camera-bound light)
             if (!app->flashlight) {
                 app->flashlight = true;
                 app->brightness = App::kDefaultBrightness;
@@ -128,6 +132,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
             break;
 
         case GLFW_KEY_N: // toggle day/night lighting
+            // Switch global lighting presets for day/night.
             if (!app->night) { // night
                 app->night = true;
                 app->brightness = 0.1f;
@@ -159,6 +164,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
 
         case GLFW_KEY_R: // reset camera to a safe default
         {
+            // Restore camera position and zero velocity; recenter cursor for a predictable state.
             glm::vec3 defaultPos = glm::vec3(0.0f, 15.0f, 0.0f);
             app->camera.Position = defaultPos;
             app->camera.Velocity = glm::vec3(0.0f);
@@ -179,7 +185,7 @@ void App::key_callback(GLFWwindow* window, int key, int scancode, int action, in
 }
 
 void App::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    // Keep viewport and projection in sync with window resizing.
+    // Resize handler: keep GL viewport and projection matrix consistent with the framebuffer.
     auto app = static_cast<App*>(glfwGetWindowUserPointer(window));
 
     glViewport(0, 0, width, height);
@@ -191,14 +197,15 @@ void App::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 void App::switch_to_fullscreen(void) {
-    // Switch to fullscreen
+    // Transition the current window into fullscreen on the monitor that contains the window center.
+    // Save previous window placement so we can restore it when exiting fullscreen.
     glfwGetWindowPos(window, &last_window_xpos, &last_window_ypos);
     glfwGetWindowSize(window, &last_window_width, &last_window_height);
 
     // Record current monitor
     last_window_monitor = glfwGetWindowMonitor(window);
 
-    // Monitor - window center (multi-monitor).
+    // Determine window center in virtual screen coordinates (multi-monitor aware).
     int wx, wy, ww, wh;
     glfwGetWindowPos(window, &wx, &wy);
     glfwGetWindowSize(window, &ww, &wh);
@@ -225,7 +232,7 @@ void App::switch_to_fullscreen(void) {
     // Switch to fullscreen on chosen monitor.
     const GLFWvidmode* mode = glfwGetVideoMode(target);
     if (!mode) {
-        // fallback
+        // fallback: do nothing if no mode found
         return;
     }
 
@@ -252,17 +259,18 @@ void App::switch_to_fullscreen(void) {
 }
 
 void App::cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    // Mouse look: convert cursor delta into yaw/pitch input.
+    // Mouse move handler: convert cursor delta to camera yaw/pitch input.
     auto app = static_cast<App*>(glfwGetWindowUserPointer(window));
 
     if (app->ignore_mouse_delta) {
+        // Ignore the first movement after recentering to avoid a large jump.
         app->cursorLastX = xpos;
         app->cursorLastY = ypos;
         app->ignore_mouse_delta = false;
         return;
     }
 
-    // Explicit cast (double -> GLfloat) to avoid precision-loss warnings.
+    // Compute delta and flip Y to match typical FPS controls.
     GLfloat dx = static_cast<GLfloat>(xpos - app->cursorLastX);
     GLfloat dy = static_cast<GLfloat>((ypos - app->cursorLastY) * -1.0);
 
@@ -272,13 +280,13 @@ void App::cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 }
 
 void App::mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    // Mouse input handler (currently used for spawning a projectile on left click).
+    // Mouse button handler: currently used to spawn a projectile on left click.
     auto app = static_cast<App*>(glfwGetWindowUserPointer(window));
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         std::cout << "[DEBUG] Mouse left pressed." << std::endl;
 
-        // Build forward direction from yaw/pitch to match the view direction exactly.
+        // Build forward direction from camera yaw/pitch so spawned projectile travels along view direction.
         glm::vec3 forward;
         {
             float yaw = app->camera.Yaw;
@@ -289,6 +297,7 @@ void App::mouse_button_callback(GLFWwindow* window, int button, int action, int 
             forward = glm::normalize(forward);
         }
 
+        // Prepare projectile model and place it slightly in front of the camera to avoid self-collision.
         Model newProj = app->projectile;
         newProj.origin = app->camera.Position + forward * App::kProjectileSpawnOffset; // spawn slightly in front of the camera
         newProj.velocity = forward * App::kProjectileSpeed;

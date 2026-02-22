@@ -99,10 +99,10 @@ public:
     ~App();
 
 private:
-    // OpenCV face detector used by the FaceTracker / face-control features.
+    // Cascade classifier used by face tracker. Stored here so loader/trackers share the same trained data.
     cv::CascadeClassifier face_cascade = cv::CascadeClassifier("resources/haarcascade_frontalface_default.xml");
 
-    // Clear color / UI color values.
+    // Clear color / UI color values (default white).
     GLfloat r{ 1.0f }, g{ 1.0f }, b{ 1.0f }, a{ 1.0f };
 
     // GLFW window handle.
@@ -117,7 +117,7 @@ private:
     float brightness = 0.0f;
 
     //------ GLFW callbacks ------
-    // All callbacks are static because GLFW expects C-style functions.
+    // GLFW requires C-style static functions for callbacks; they retrieve the App instance via the window user pointer.
     static void error_callback(int error, const char* description);
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
@@ -125,7 +125,7 @@ private:
     static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
     //------ Model transform ------
-    // Default transform for a currently controlled object (or for quick testing).
+    // Default transform used by quick-testing code (translate/rotate/scale applied to drawn models).
     glm::vec3 translate = glm::vec3(0.0f);
     glm::vec3 rotate = glm::vec3(0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
@@ -143,7 +143,7 @@ private:
     bool ignore_mouse_delta = false;
 
     //------ Fullscreen bookkeeping ------
-    // Save last windowed placement so we can return from fullscreen.
+    // Save last windowed placement so we can properly restore when exiting fullscreen.
     int last_window_xpos = 0;
     int last_window_ypos = 0;
     int last_window_height = 0;
